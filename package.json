@@ -1,5 +1,5 @@
 {
-  "name": "curve25519-node",
+  "name": "@unknownncat/curve25519-node",
   "version": "1.0.0",
   "description": "Modern zero-dependency X25519 + Ed25519 for Node.js using OpenSSL via node:crypto",
   "keywords": [

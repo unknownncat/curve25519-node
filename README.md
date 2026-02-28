@@ -48,7 +48,7 @@ import {
   ed25519,
   sign, // compat top-level (Ed25519)
   verify, // compat top-level (Ed25519)
-} from "unknownncat-curve25519-node";
+} from "@unknownncat/curve25519-node";
 
 const aliceSeed = asBytes32(crypto.getRandomValues(new Uint8Array(32)));
 const bobSeed = asBytes32(crypto.getRandomValues(new Uint8Array(32)));
@@ -74,7 +74,7 @@ const opened = ed25519.openMessage(ed.public, signedMsg);
 ### Uso em CommonJS
 
 ```js
-const { x25519, ed25519, asBytes32 } = require("unknownncat-curve25519-node");
+const { x25519, ed25519, asBytes32 } = require("@unknownncat/curve25519-node");
 
 const seed = asBytes32(new Uint8Array(32));
 const kp = x25519.generateKeyPair(seed);
