@@ -2,6 +2,7 @@
 
 Esta pasta e um projeto separado para benchmark.  
 Nao adiciona dependencias runtime ao pacote principal.
+Este subprojeto e privado (`private: true`) e nao deve ser publicado no npm.
 
 ## O que este bench garante
 
@@ -46,6 +47,8 @@ npm run build
 cd bench
 npm install
 ```
+
+Publicacao npm deve ser feita na raiz do projeto principal, nao dentro de `bench/`.
 
 Execucoes:
 

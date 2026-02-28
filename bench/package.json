@@ -1,7 +1,7 @@
 {
   "name": "curve25519-node-bench",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Benchmarks for @unknownncat/curve25519-node vs curve25519-js",
   "scripts": {
@@ -10,7 +10,8 @@
     "bench:full": "node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --variants=raw,cached,nocopy,copy --verifyDuringBench --verifyEvery=64",
     "bench:strict": "node --expose-gc bench.mjs --rounds=12 --roundMs=250 --warmupMs=300 --variants=raw,cached --strict",
     "bench:ci": "node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --vectors=64 --variants=raw,cached --strict --verifyEvery=64 --jsonFile=results/bench-results.json",
-    "bench:regression": "node --expose-gc bench.mjs --variants=raw,cached --strict --baseline=results/bench-baseline.json --failOnRegression --maxRegressionPct=10"
+    "bench:regression": "node --expose-gc bench.mjs --variants=raw,cached --strict --baseline=results/bench-baseline.json --failOnRegression --maxRegressionPct=10",
+    "prepublishOnly": "node -e \"console.error('bench/ is private and should not be published. Publish from repository root package instead.'); process.exit(1)\""
   },
   "dependencies": {
     "@unknownncat/curve25519-node": "file:..",
