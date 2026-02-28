@@ -5,9 +5,12 @@
   "type": "module",
   "description": "Benchmarks for @unknownncat/curve25519-node vs curve25519-js",
   "scripts": {
-    "bench": "node --expose-gc bench.mjs",
-    "bench:quick": "node --expose-gc bench.mjs --rounds=8 --roundMs=180 --warmupMs=200",
-    "bench:full": "node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500"
+    "bench": "node --expose-gc bench.mjs --variants=raw",
+    "bench:quick": "node --expose-gc bench.mjs --rounds=8 --roundMs=180 --warmupMs=200 --variants=raw",
+    "bench:full": "node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --variants=raw,cached,nocopy,copy --verifyDuringBench --verifyEvery=64",
+    "bench:strict": "node --expose-gc bench.mjs --rounds=12 --roundMs=250 --warmupMs=300 --variants=raw,cached --strict",
+    "bench:ci": "node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --vectors=64 --variants=raw,cached --strict --verifyEvery=64 --jsonFile=results/bench-results.json",
+    "bench:regression": "node --expose-gc bench.mjs --variants=raw,cached --strict --baseline=results/bench-baseline.json --failOnRegression --maxRegressionPct=10"
   },
   "dependencies": {
     "@unknownncat/curve25519-node": "file:..",

@@ -1,57 +1,111 @@
-# Benchmarks (isolated project)
+# Benchmarks (subprojeto isolado)
 
-Esta pasta e um subprojeto separado para benchmark, sem adicionar dependencias ao pacote principal.
+Esta pasta e um projeto separado para benchmark.  
+Nao adiciona dependencias runtime ao pacote principal.
 
-## Objetivo
+## O que este bench garante
 
-Comparar throughput de `@unknownncat/curve25519-node` vs `curve25519-js` em:
+- fairness: warmup, rounds, round duration, ordem aleatoria por round
+- medicao com `process.hrtime.bigint()`
+- estatisticas: `mean`, `p50`, `p95`, `stdev`
+- pool rotativo de vetores (minimo 64 seeds/messages/keypairs)
+- validacao de corretude antes de medir
+- validacao opcional durante benchmark (`--verifyDuringBench`)
+- saida humana + JSON (`--json` / `--jsonFile=...`)
+- modo estrito (`--strict`) para falhar em inconsistencias
+- suporte a baseline para detectar regressao
 
-- `generateKeyPair`
-- `sharedKey`
-- `sign` / `verify`
-- `signMessage` / `openMessage`
+## Importante sobre assinaturas
 
-## Importante
+`@unknownncat/curve25519-node` usa Ed25519 padrao.  
+`curve25519-js` usa esquema axlsign.
 
-- `sharedKey` e `generateKeyPair` sao comparacoes diretas de X25519.
-- `sign`/`verify` e `signMessage`/`openMessage` **nao** sao esquema-identicos:
-  - moderno: Ed25519 padrao
-  - legado (`curve25519-js`): esquema axlsign (conversoes e sign bit)
-- o legado pode mutar o `signedMessage` em `openMessage`; por isso o bench usa copia por iteracao.
+Por isso:
 
-Use essas comparacoes de assinatura como referencia de throughput de API, nao equivalencia criptografica.
+- comparacoes de `sign`/`verify` e `signMessage`/`openMessage` medem throughput de API
+- nao medem equivalencia criptografica entre esquemas diferentes
+
+Mensagem exibida no bench:
+
+`sign/verify comparisons measure API throughput, not cryptographic equivalence`
+
+## Variantes
+
+- `raw`: caminho normal da API
+- `cached`: reutiliza `KeyObject` quando possivel (lado moderno)
+- `copy`: copia buffers antes das chamadas
+- `nocopy`: evita copias quando seguro  
+  observacao: `legacy openMessage` sempre recebe copia porque muta o input
 
 ## Como rodar
 
-Na raiz do repositório:
+Na raiz:
 
 ```bash
 npm run build
 cd bench
 npm install
-npm run bench
 ```
 
-Perfis:
+Execucoes:
 
 ```bash
+npm run bench
 npm run bench:quick
 npm run bench:full
+npm run bench:strict
+npm run bench:ci
 ```
 
-Parametros custom:
+## Flags CLI
 
 ```bash
-node --expose-gc bench.mjs --rounds=20 --roundMs=400 --warmupMs=600
+node --expose-gc bench.mjs \
+  --rounds=16 \
+  --roundMs=350 \
+  --warmupMs=500 \
+  --vectors=64 \
+  --variants=raw,cached \
+  --verifyDuringBench \
+  --verifyEvery=64 \
+  --strict \
+  --debug \
+  --json \
+  --jsonFile=results/bench-results.json
 ```
 
-## Saida
+Flags disponiveis:
 
-Para cada par de testes:
+- `--rounds=<n>`
+- `--roundMs=<ms>`
+- `--warmupMs=<ms>`
+- `--vectors=<n>` (minimo 64)
+- `--variants=raw,cached,copy,nocopy`
+- `--gc` / `--no-gc`
+- `--verifyDuringBench`
+- `--verifyEvery=<n>`
+- `--strict`
+- `--debug`
+- `--json`
+- `--jsonFile=<path>`
+- `--baseline=<path>`
+- `--maxRegressionPct=<n>`
+- `--failOnRegression`
 
-- `mean ops/s`
-- `p50`
-- `p95`
-- `stdev`
-- `rounds`
-- fator relativo (`X is Yx faster than Z`)
+## Regressao
+
+Gerar baseline:
+
+```bash
+node --expose-gc bench.mjs --variants=raw,cached --jsonFile=results/bench-baseline.json
+```
+
+Comparar com baseline e falhar se piorar acima do limite:
+
+```bash
+node --expose-gc bench.mjs \
+  --variants=raw,cached \
+  --baseline=results/bench-baseline.json \
+  --maxRegressionPct=10 \
+  --failOnRegression
+```

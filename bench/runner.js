@@ -1,0 +1,1168 @@
+import {
+  createPrivateKey,
+  createPublicKey,
+  createHash,
+  diffieHellman,
+  sign as cryptoSign,
+  verify as cryptoVerify,
+  timingSafeEqual,
+} from "node:crypto";
+import { cpus } from "node:os";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+import legacyCurve from "curve25519-js";
+import { asBytes32, asBytes64, ed25519, x25519 } from "@unknownncat/curve25519-node";
+
+import { parseArgs, modeSummary } from "./config.js";
+import { buildInputPool, copyU8, maybeCopyU8, createCycler } from "./pool.js";
+import {
+  createIssueManager,
+  assertBytesEqual,
+  assertPayloadEqual,
+  assertTrue,
+} from "./validators.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const rootDir = join(__dirname, "..");
+
+const rootDistEntry = join(rootDir, "dist", "index.js");
+if (!existsSync(rootDistEntry)) {
+  throw new Error(
+    "dist/ nao encontrado no projeto principal. Rode `npm run build` na raiz antes do benchmark."
+  );
+}
+
+const X25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b656e04220420", "hex");
+const X25519_SPKI_PREFIX = Buffer.from("302a300506032b656e032100", "hex");
+const ED25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
+const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
+
+const SIGN_NOTE = "sign/verify comparisons measure API throughput, not cryptographic equivalence";
+const OPENMSG_NOTE =
+  "legacy openMessage mutates signed input; safe-copy mode is used to avoid invalid benchmarks";
+
+function debugLog(config, message) {
+  if (!config.debug || config.quiet) return;
+  console.log(`[debug] ${message}`);
+}
+
+function u8View(buf) {
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+}
+
+function appendRaw32(prefix, raw32) {
+  const out = Buffer.allocUnsafe(prefix.length + 32);
+  out.set(prefix, 0);
+  out.set(raw32, prefix.length);
+  return out;
+}
+
+function derPkcs8(prefix, raw32) {
+  return appendRaw32(prefix, raw32);
+}
+
+function derSpki(prefix, raw32) {
+  return appendRaw32(prefix, raw32);
+}
+
+function keyFromX25519Private(raw32) {
+  return createPrivateKey({
+    key: derPkcs8(X25519_PKCS8_PREFIX, raw32),
+    format: "der",
+    type: "pkcs8",
+  });
+}
+
+function keyFromX25519Public(raw32) {
+  return createPublicKey({
+    key: derSpki(X25519_SPKI_PREFIX, raw32),
+    format: "der",
+    type: "spki",
+  });
+}
+
+function keyFromEd25519Private(raw32) {
+  return createPrivateKey({
+    key: derPkcs8(ED25519_PKCS8_PREFIX, raw32),
+    format: "der",
+    type: "pkcs8",
+  });
+}
+
+function keyFromEd25519Public(raw32) {
+  return createPublicKey({
+    key: derSpki(ED25519_SPKI_PREFIX, raw32),
+    format: "der",
+    type: "spki",
+  });
+}
+
+function rawPublicFromSpki(keyObject, prefix, label) {
+  const exported = keyObject.export({ format: "der", type: "spki" });
+  if (!Buffer.isBuffer(exported)) {
+    throw new TypeError(`${label} SPKI export must be Buffer`);
+  }
+  const expectedLength = prefix.length + 32;
+  if (exported.byteLength !== expectedLength) {
+    throw new Error(`${label} SPKI length mismatch: got ${exported.byteLength}`);
+  }
+  const prefixActual = exported.subarray(0, prefix.length);
+  if (!timingSafeEqual(prefixActual, prefix)) {
+    throw new Error(`${label} SPKI prefix mismatch`);
+  }
+  return asBytes32(u8View(exported).subarray(prefix.length), `${label} public key`);
+}
+
+function clampScalar(seed32) {
+  const out = new Uint8Array(32);
+  out.set(seed32);
+  out[0] &= 248;
+  out[31] &= 127;
+  out[31] |= 64;
+  return asBytes32(out, "clamped scalar");
+}
+
+function maybeGc(config) {
+  if (!config.gc) return;
+  if (typeof globalThis.gc === "function") {
+    globalThis.gc();
+  }
+}
+
+function nowNs() {
+  return process.hrtime.bigint();
+}
+
+function runForDuration(task, ms, config) {
+  const start = nowNs();
+  const deadline = start + BigInt(Math.floor(ms * 1e6));
+  let count = 0;
+  let current = start;
+
+  while (current < deadline) {
+    const result = task.run();
+    count += 1;
+
+    if (config.verifyDuringBench && task.verify && count % config.verifyEvery === 0) {
+      task.verify(result, count);
+    }
+
+    current = nowNs();
+  }
+
+  const elapsedSec = Number(current - start) / 1e9;
+  return {
+    count,
+    elapsedSec,
+    opsPerSec: count / elapsedSec,
+  };
+}
+
+function quantile(sorted, q) {
+  if (sorted.length === 0) return 0;
+  if (sorted.length === 1) return sorted[0];
+  const pos = (sorted.length - 1) * q;
+  const low = Math.floor(pos);
+  const high = Math.ceil(pos);
+  if (low === high) return sorted[low];
+  const ratio = pos - low;
+  return sorted[low] + (sorted[high] - sorted[low]) * ratio;
+}
+
+function summarize(samples) {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const n = sorted.length;
+  const mean = sorted.reduce((acc, v) => acc + v, 0) / n;
+  const variance = sorted.reduce((acc, v) => acc + (v - mean) ** 2, 0) / n;
+  return {
+    rounds: n,
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    mean,
+    p50: quantile(sorted, 0.5),
+    p95: quantile(sorted, 0.95),
+    stdev: Math.sqrt(variance),
+  };
+}
+
+function fmtOps(value) {
+  return value.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
+function fmtPercent(value) {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(2)}%`;
+}
+
+function hashText(text) {
+  const digest = createHash("sha256").update(text).digest();
+  return digest.readUInt32LE(0);
+}
+
+function shuffleWithSeed(items, seedText) {
+  const out = [...items];
+  let state = hashText(seedText) || 0x9e3779b9;
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    const j = Math.abs(state) % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function percentDelta(current, reference) {
+  if (reference === 0) return 0;
+  return ((current - reference) / reference) * 100;
+}
+
+function printSuiteHeader(meta, config) {
+  if (config.quiet) return;
+  console.log("curve25519 benchmark suite");
+  console.log(`node: ${meta.node}`);
+  console.log(`openssl: ${meta.openssl}`);
+  console.log(`cpu: ${meta.cpuModel} (logical cores: ${meta.logicalCores})`);
+  console.log(
+    `config: rounds=${config.rounds}, roundMs=${config.roundMs}, warmupMs=${config.warmupMs}, vectors=${config.vectors}, gc=${config.gc}`
+  );
+  console.log(
+    `modes: variants=${config.variants.join(",")}, strict=${config.strict}, debug=${config.debug}, verifyDuringBench=${config.verifyDuringBench}, verifyEvery=${config.verifyEvery}`
+  );
+  console.log(`note: ${SIGN_NOTE}.`);
+}
+
+function printPairReport(pairReport, config) {
+  if (config.quiet) return;
+  console.log(`\n=== ${pairReport.label} ===`);
+  console.log(
+    "impl".padEnd(36) +
+      "mean ops/s".padStart(14) +
+      "p50".padStart(12) +
+      "p95".padStart(12) +
+      "stdev".padStart(12) +
+      "rounds".padStart(9)
+  );
+  console.log("-".repeat(98));
+
+  for (const impl of pairReport.implementations) {
+    const s = impl.stats;
+    console.log(
+      impl.name.padEnd(36) +
+        fmtOps(s.mean).padStart(14) +
+        fmtOps(s.p50).padStart(12) +
+        fmtOps(s.p95).padStart(12) +
+        fmtOps(s.stdev).padStart(12) +
+        String(s.rounds).padStart(9)
+    );
+  }
+
+  if (pairReport.implementations.length === 2) {
+    const [a, b] = pairReport.implementations;
+    const faster = a.stats.mean >= b.stats.mean ? a : b;
+    const slower = faster === a ? b : a;
+    const speedup = faster.stats.mean / slower.stats.mean;
+    const delta = percentDelta(faster.stats.mean, slower.stats.mean);
+    console.log(
+      `=> ${faster.name} is ${speedup.toFixed(2)}x faster (${fmtPercent(delta)}) than ${slower.name} (mean ops/s).`
+    );
+  }
+}
+
+async function writeJsonOutput(output, config) {
+  if (!config.json && !config.jsonFile) return;
+  const json = JSON.stringify(output, null, 2);
+
+  if (config.json) {
+    console.log("\n--- JSON ---");
+    console.log(json);
+  }
+
+  if (config.jsonFile) {
+    const filePath = join(__dirname, config.jsonFile);
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, `${json}\n`, "utf8");
+    if (!config.quiet) {
+      console.log(`\nJSON report written to: ${filePath}`);
+    }
+  }
+}
+
+function buildContext(config) {
+  const pool = buildInputPool(config.vectors);
+  const vectorCount = pool.vectorCount;
+
+  const seeds32 = pool.seeds.map((seed, i) => asBytes32(seed, `seed[${i}]`));
+  const modernXKeyPairs = seeds32.map((seed) => x25519.generateKeyPair(seed));
+  const legacyXKeyPairs = pool.seeds.map((seed) => legacyCurve.generateKeyPair(seed));
+  const modernEdKeyPairs = seeds32.map((seed) => ed25519.generateKeyPair(seed));
+
+  const modernSharedVectors = modernXKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    public: modernXKeyPairs[(i + 1) % vectorCount].public,
+  }));
+  const legacySharedVectors = legacyXKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    public: legacyXKeyPairs[(i + 1) % vectorCount].public,
+  }));
+
+  const sharedExpected = modernSharedVectors.map((v) => x25519.sharedKey(v.secret, v.public));
+
+  const modernSign32Vectors = seeds32.map((seed, i) => ({
+    index: i,
+    seed,
+    msg: pool.msg32[i],
+    public: modernEdKeyPairs[i].public,
+  }));
+  const legacySign32Vectors = legacyXKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg32[i],
+    public: kp.public,
+  }));
+
+  const modernSign1024Vectors = seeds32.map((seed, i) => ({
+    index: i,
+    seed,
+    msg: pool.msg1024[i],
+    public: modernEdKeyPairs[i].public,
+  }));
+  const legacySign1024Vectors = legacyXKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg1024[i],
+    public: kp.public,
+  }));
+
+  const modernVerify32Vectors = modernSign32Vectors.map((v) => ({
+    ...v,
+    signature: ed25519.sign(v.seed, v.msg),
+  }));
+  const legacyVerify32Vectors = legacySign32Vectors.map((v) => ({
+    ...v,
+    signature: legacyCurve.sign(v.secret, v.msg),
+  }));
+
+  const modernVerify1024Vectors = modernSign1024Vectors.map((v) => ({
+    ...v,
+    signature: ed25519.sign(v.seed, v.msg),
+  }));
+  const legacyVerify1024Vectors = legacySign1024Vectors.map((v) => ({
+    ...v,
+    signature: legacyCurve.sign(v.secret, v.msg),
+  }));
+
+  const modernSignMessageVectors = seeds32.map((seed, i) => ({
+    index: i,
+    seed,
+    msg: pool.msg256[i],
+    public: modernEdKeyPairs[i].public,
+  }));
+  const legacySignMessageVectors = legacyXKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg256[i],
+    public: kp.public,
+  }));
+
+  const modernOpenMessageVectors = modernSignMessageVectors.map((v) => ({
+    ...v,
+    signed: ed25519.signMessage(v.seed, v.msg),
+  }));
+  const legacyOpenMessageVectors = legacySignMessageVectors.map((v) => ({
+    ...v,
+    signed: legacyCurve.signMessage(v.secret, v.msg),
+  }));
+
+  const cached = {
+    x25519: {
+      privateKeys: modernXKeyPairs.map((kp) => keyFromX25519Private(kp.private)),
+      publicKeys: modernXKeyPairs.map((kp) => keyFromX25519Public(kp.public)),
+    },
+    ed25519: {
+      privateKeys: seeds32.map((seed) => keyFromEd25519Private(seed)),
+      publicKeys: modernEdKeyPairs.map((kp) => keyFromEd25519Public(kp.public)),
+    },
+  };
+
+  return {
+    vectorCount,
+    pool,
+    seeds32,
+    modernXKeyPairs,
+    legacyXKeyPairs,
+    modernEdKeyPairs,
+    modernSharedVectors,
+    legacySharedVectors,
+    sharedExpected,
+    modernSign32Vectors,
+    legacySign32Vectors,
+    modernSign1024Vectors,
+    legacySign1024Vectors,
+    modernVerify32Vectors,
+    legacyVerify32Vectors,
+    modernVerify1024Vectors,
+    legacyVerify1024Vectors,
+    modernSignMessageVectors,
+    legacySignMessageVectors,
+    modernOpenMessageVectors,
+    legacyOpenMessageVectors,
+    cached,
+  };
+}
+
+function runPreflightValidation(context, issues, config) {
+  debugLog(config, "running preflight correctness validation");
+  const count = context.vectorCount;
+
+  for (let i = 0; i < count; i += 1) {
+    const modernX = context.modernXKeyPairs[i];
+    const legacyX = context.legacyXKeyPairs[i];
+    const peerIndex = (i + 1) % count;
+
+    const clamped = clampScalar(context.seeds32[i]);
+    const modernPublicFromSecret = x25519.publicKey(clamped);
+    assertBytesEqual(
+      `x25519 publicKey modern vs legacy [${i}]`,
+      modernPublicFromSecret,
+      legacyX.public,
+      issues
+    );
+
+    assertBytesEqual(
+      `x25519 generateKeyPair public modern vs legacy [${i}]`,
+      modernX.public,
+      legacyX.public,
+      issues
+    );
+
+    const modernShared = x25519.sharedKey(modernX.private, context.modernXKeyPairs[peerIndex].public);
+    const legacyShared = legacyCurve.sharedKey(legacyX.private, context.legacyXKeyPairs[peerIndex].public);
+    assertBytesEqual(`x25519 sharedKey modern vs legacy [${i}]`, modernShared, legacyShared, issues);
+  }
+
+  for (let i = 0; i < count; i += 1) {
+    const modern32 = context.modernVerify32Vectors[i];
+    const legacy32 = context.legacyVerify32Vectors[i];
+    const modern1024 = context.modernVerify1024Vectors[i];
+    const legacy1024 = context.legacyVerify1024Vectors[i];
+
+    assertTrue(
+      `ed25519 verify(sign(msg32)) [${i}]`,
+      ed25519.verify(modern32.public, modern32.msg, modern32.signature),
+      issues
+    );
+    assertTrue(
+      `legacy verify(sign(msg32)) [${i}]`,
+      legacyCurve.verify(legacy32.public, legacy32.msg, legacy32.signature),
+      issues
+    );
+
+    assertTrue(
+      `ed25519 verify(sign(msg1024)) [${i}]`,
+      ed25519.verify(modern1024.public, modern1024.msg, modern1024.signature),
+      issues
+    );
+    assertTrue(
+      `legacy verify(sign(msg1024)) [${i}]`,
+      legacyCurve.verify(legacy1024.public, legacy1024.msg, legacy1024.signature),
+      issues
+    );
+
+    const modernSigned = context.modernOpenMessageVectors[i];
+    const legacySigned = context.legacyOpenMessageVectors[i];
+
+    const modernOpened = ed25519.openMessage(modernSigned.public, modernSigned.signed);
+    assertPayloadEqual(`ed25519 signMessage/openMessage [${i}]`, modernOpened, modernSigned.msg, issues);
+
+    const legacyOpened = legacyCurve.openMessage(legacySigned.public, copyU8(legacySigned.signed));
+    assertPayloadEqual(`legacy signMessage/openMessage [${i}]`, legacyOpened, legacySigned.msg, issues);
+  }
+}
+
+function makeSafeOpenInput(variant, signed, forceCopyForSafety) {
+  if (forceCopyForSafety) return copyU8(signed);
+  if (variant === "copy") return copyU8(signed);
+  if (variant === "nocopy") return signed;
+  return copyU8(signed);
+}
+
+function buildModernTasksForVariant(context, variant, issues, config) {
+  const n = context.vectorCount;
+
+  const nextSeed = createCycler(context.seeds32);
+  const nextShared = createCycler(context.modernSharedVectors);
+  const nextSign32 = createCycler(context.modernSign32Vectors);
+  const nextSign1024 = createCycler(context.modernSign1024Vectors);
+  const nextVerify32 = createCycler(context.modernVerify32Vectors);
+  const nextVerify1024 = createCycler(context.modernVerify1024Vectors);
+  const nextSignMessage = createCycler(context.modernSignMessageVectors);
+  const nextOpenMessage = createCycler(context.modernOpenMessageVectors);
+
+  const makeModernSign = (vector, msg) => {
+    if (variant === "cached") {
+      const signature = cryptoSign(
+        null,
+        variant === "copy" ? copyU8(msg) : msg,
+        context.cached.ed25519.privateKeys[vector.index]
+      );
+      return asBytes64(u8View(signature), "modern signature");
+    }
+
+    const seedInput = variant === "copy" ? asBytes32(copyU8(vector.seed), "seed copy") : vector.seed;
+    const msgInput = maybeCopyU8(msg, variant === "copy");
+    return ed25519.sign(seedInput, msgInput);
+  };
+
+  const makeModernVerify = (vector) => {
+    const msgInput = maybeCopyU8(vector.msg, variant === "copy");
+    const signatureInput = variant === "copy" ? asBytes64(copyU8(vector.signature), "signature copy") : vector.signature;
+    const publicInput = variant === "copy" ? asBytes32(copyU8(vector.public), "public key copy") : vector.public;
+
+    if (variant === "cached") {
+      return cryptoVerify(
+        null,
+        msgInput,
+        context.cached.ed25519.publicKeys[vector.index],
+        signatureInput
+      );
+    }
+
+    return ed25519.verify(publicInput, msgInput, signatureInput);
+  };
+
+  return {
+    generateKeyPair: (() => {
+      let last = null;
+      return {
+        name: "modern x25519.generateKeyPair",
+        run: () => {
+          const selected = nextSeed();
+          last = selected;
+          const seed = selected.value;
+          if (variant === "cached") {
+            const privateRaw = context.modernXKeyPairs[selected.index].private;
+            const pub = rawPublicFromSpki(
+              createPublicKey(context.cached.x25519.privateKeys[selected.index]),
+              X25519_SPKI_PREFIX,
+              "X25519"
+            );
+            return { public: pub, private: privateRaw };
+          }
+          const seedInput = variant === "copy" ? asBytes32(copyU8(seed), "seed copy") : seed;
+          return x25519.generateKeyPair(seedInput);
+        },
+        verify: (result) => {
+          const expected = context.modernXKeyPairs[last.index];
+          assertBytesEqual("modern generateKeyPair public", result.public, expected.public, issues);
+          assertBytesEqual("modern generateKeyPair private", result.private, expected.private, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sharedKey: (() => {
+      let last = null;
+      return {
+        name: "modern x25519.sharedKey",
+        run: () => {
+          const selected = nextShared();
+          last = selected;
+          const input = selected.value;
+          if (variant === "cached") {
+            const shared = diffieHellman({
+              privateKey: context.cached.x25519.privateKeys[input.index],
+              publicKey: context.cached.x25519.publicKeys[(input.index + 1) % n],
+            });
+            return asBytes32(u8View(shared), "shared key");
+          }
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+          return x25519.sharedKey(secretInput, publicInput);
+        },
+        verify: (result) => {
+          const expected = context.sharedExpected[last.index];
+          assertBytesEqual("modern sharedKey", result, expected, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sign32: (() => {
+      let last = null;
+      return {
+        name: "modern ed25519.sign",
+        run: () => {
+          const selected = nextSign32();
+          last = selected;
+          return makeModernSign(selected.value, selected.value.msg);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern sign(msg32) verifies",
+            ed25519.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    sign1024: (() => {
+      let last = null;
+      return {
+        name: "modern ed25519.sign",
+        run: () => {
+          const selected = nextSign1024();
+          last = selected;
+          return makeModernSign(selected.value, selected.value.msg);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern sign(msg1024) verifies",
+            ed25519.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    verify32: {
+      name: "modern ed25519.verify",
+      run: () => makeModernVerify(nextVerify32().value),
+      verify: (ok) => {
+        assertTrue("modern verify(msg32)", ok, issues);
+      },
+      samples: [],
+    },
+    verify1024: {
+      name: "modern ed25519.verify",
+      run: () => makeModernVerify(nextVerify1024().value),
+      verify: (ok) => {
+        assertTrue("modern verify(msg1024)", ok, issues);
+      },
+      samples: [],
+    },
+    signMessage: (() => {
+      let last = null;
+      return {
+        name: "modern ed25519.signMessage",
+        run: () => {
+          const selected = nextSignMessage();
+          last = selected;
+          const v = selected.value;
+
+          if (variant === "cached") {
+            const signature = cryptoSign(
+              null,
+              variant === "copy" ? copyU8(v.msg) : v.msg,
+              context.cached.ed25519.privateKeys[v.index]
+            );
+            const out = new Uint8Array(64 + v.msg.byteLength);
+            out.set(signature, 0);
+            out.set(v.msg, 64);
+            return out;
+          }
+
+          const seedInput = variant === "copy" ? asBytes32(copyU8(v.seed), "seed copy") : v.seed;
+          const msgInput = maybeCopyU8(v.msg, variant === "copy");
+          return ed25519.signMessage(seedInput, msgInput);
+        },
+        verify: (signed) => {
+          const input = last.value;
+          const opened = ed25519.openMessage(input.public, signed);
+          assertPayloadEqual("modern signMessage/openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    openMessage: (() => {
+      let last = null;
+      return {
+        name: "modern ed25519.openMessage",
+        run: () => {
+          const selected = nextOpenMessage();
+          last = selected;
+          const input = selected.value;
+          const signedInput = makeSafeOpenInput(variant, input.signed, variant !== "nocopy");
+
+          if (variant === "cached") {
+            const signature = asBytes64(signedInput.subarray(0, 64), "signature");
+            const msg = signedInput.subarray(64);
+            const verified = cryptoVerify(
+              null,
+              msg,
+              context.cached.ed25519.publicKeys[input.index],
+              signature
+            );
+            if (!verified) return null;
+            return new Uint8Array(msg);
+          }
+
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public key copy") : input.public;
+          return ed25519.openMessage(publicInput, signedInput);
+        },
+        verify: (opened) => {
+          const input = last.value;
+          assertPayloadEqual("modern openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+  };
+}
+
+function buildLegacyTasksForVariant(context, variant, issues) {
+  const nextSeed = createCycler(context.pool.seeds);
+  const nextShared = createCycler(context.legacySharedVectors);
+  const nextSign32 = createCycler(context.legacySign32Vectors);
+  const nextSign1024 = createCycler(context.legacySign1024Vectors);
+  const nextVerify32 = createCycler(context.legacyVerify32Vectors);
+  const nextVerify1024 = createCycler(context.legacyVerify1024Vectors);
+  const nextSignMessage = createCycler(context.legacySignMessageVectors);
+  const nextOpenMessage = createCycler(context.legacyOpenMessageVectors);
+
+  return {
+    generateKeyPair: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.generateKeyPair",
+        run: () => {
+          const selected = nextSeed();
+          last = selected;
+          const seedInput = maybeCopyU8(selected.value, variant === "copy");
+          return legacyCurve.generateKeyPair(seedInput);
+        },
+        verify: (result) => {
+          const expected = context.legacyXKeyPairs[last.index];
+          assertBytesEqual("legacy generateKeyPair public", result.public, expected.public, issues);
+          assertBytesEqual("legacy generateKeyPair private", result.private, expected.private, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sharedKey: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.sharedKey",
+        run: () => {
+          const selected = nextShared();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const publicInput = maybeCopyU8(input.public, variant === "copy");
+          return legacyCurve.sharedKey(secretInput, publicInput);
+        },
+        verify: (result) => {
+          const expected = context.sharedExpected[last.index];
+          assertBytesEqual("legacy sharedKey", result, expected, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sign32: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.sign",
+        run: () => {
+          const selected = nextSign32();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return legacyCurve.sign(secretInput, msgInput);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "legacy sign(msg32) verifies",
+            legacyCurve.verify(input.public, input.msg, signature),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    sign1024: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.sign",
+        run: () => {
+          const selected = nextSign1024();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return legacyCurve.sign(secretInput, msgInput);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "legacy sign(msg1024) verifies",
+            legacyCurve.verify(input.public, input.msg, signature),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    verify32: {
+      name: "legacy curve.verify",
+      run: () => {
+        const input = nextVerify32().value;
+        const msgInput = maybeCopyU8(input.msg, variant === "copy");
+        const signatureInput = maybeCopyU8(input.signature, variant === "copy");
+        const publicInput = maybeCopyU8(input.public, variant === "copy");
+        return legacyCurve.verify(publicInput, msgInput, signatureInput);
+      },
+      verify: (ok) => {
+        assertTrue("legacy verify(msg32)", ok, issues);
+      },
+      samples: [],
+    },
+    verify1024: {
+      name: "legacy curve.verify",
+      run: () => {
+        const input = nextVerify1024().value;
+        const msgInput = maybeCopyU8(input.msg, variant === "copy");
+        const signatureInput = maybeCopyU8(input.signature, variant === "copy");
+        const publicInput = maybeCopyU8(input.public, variant === "copy");
+        return legacyCurve.verify(publicInput, msgInput, signatureInput);
+      },
+      verify: (ok) => {
+        assertTrue("legacy verify(msg1024)", ok, issues);
+      },
+      samples: [],
+    },
+    signMessage: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.signMessage",
+        run: () => {
+          const selected = nextSignMessage();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return legacyCurve.signMessage(secretInput, msgInput);
+        },
+        verify: (signed) => {
+          const input = last.value;
+          const opened = legacyCurve.openMessage(input.public, copyU8(signed));
+          assertPayloadEqual("legacy signMessage/openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    openMessage: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.openMessage",
+        run: () => {
+          const selected = nextOpenMessage();
+          last = selected;
+          const input = selected.value;
+          const publicInput = maybeCopyU8(input.public, variant === "copy");
+          const signedInput = copyU8(input.signed);
+          return legacyCurve.openMessage(publicInput, signedInput);
+        },
+        verify: (opened) => {
+          const input = last.value;
+          assertPayloadEqual("legacy openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+  };
+}
+
+function buildPairDescriptors(context, variant, issues, config) {
+  const modern = buildModernTasksForVariant(context, variant, issues, config);
+  const legacy = buildLegacyTasksForVariant(context, variant, issues);
+
+  return [
+    {
+      id: `x25519.generateKeyPair.${variant}`,
+      label: `[${variant}] X25519 generateKeyPair(seed32)`,
+      tasks: [modern.generateKeyPair, legacy.generateKeyPair],
+    },
+    {
+      id: `x25519.sharedKey.${variant}`,
+      label: `[${variant}] X25519 sharedKey(sk, pk)`,
+      tasks: [modern.sharedKey, legacy.sharedKey],
+    },
+    {
+      id: `sign.32.${variant}`,
+      label: `[${variant}] Signature sign(msg32) [different schemes]`,
+      tasks: [modern.sign32, legacy.sign32],
+    },
+    {
+      id: `sign.1024.${variant}`,
+      label: `[${variant}] Signature sign(msg1024) [different schemes]`,
+      tasks: [modern.sign1024, legacy.sign1024],
+    },
+    {
+      id: `verify.32.${variant}`,
+      label: `[${variant}] Signature verify(msg32) [different schemes]`,
+      tasks: [modern.verify32, legacy.verify32],
+    },
+    {
+      id: `verify.1024.${variant}`,
+      label: `[${variant}] Signature verify(msg1024) [different schemes]`,
+      tasks: [modern.verify1024, legacy.verify1024],
+    },
+    {
+      id: `signMessage.256.${variant}`,
+      label: `[${variant}] signMessage(msg256)`,
+      tasks: [modern.signMessage, legacy.signMessage],
+    },
+    {
+      id: `openMessage.256.${variant}`,
+      label: `[${variant}] openMessage(msg256)`,
+      tasks: [modern.openMessage, legacy.openMessage],
+    },
+  ];
+}
+
+function runPair(pair, config) {
+  for (const task of pair.tasks) {
+    runForDuration(task, config.warmupMs, {
+      ...config,
+      verifyDuringBench: false,
+    });
+    maybeGc(config);
+  }
+
+  for (let round = 0; round < config.rounds; round += 1) {
+    const orderedTasks = shuffleWithSeed(pair.tasks, `${pair.id}:${round}`);
+    for (const task of orderedTasks) {
+      const sample = runForDuration(task, config.roundMs, config);
+      task.samples.push(sample.opsPerSec);
+      maybeGc(config);
+    }
+  }
+
+  const implementations = pair.tasks.map((task) => ({
+    name: task.name,
+    stats: summarize(task.samples),
+  }));
+
+  return {
+    id: pair.id,
+    label: pair.label,
+    implementations,
+  };
+}
+
+function flattenImplementationRows(pairReports) {
+  const rows = [];
+  for (const pair of pairReports) {
+    for (const impl of pair.implementations) {
+      rows.push({
+        pairId: pair.id,
+        pairLabel: pair.label,
+        implName: impl.name,
+        stats: impl.stats,
+      });
+    }
+  }
+  return rows;
+}
+
+function readBaseline(baselinePath, config) {
+  if (!baselinePath) return null;
+  const fullPath = join(__dirname, baselinePath);
+  if (!existsSync(fullPath)) {
+    throw new Error(`baseline file not found: ${fullPath}`);
+  }
+  const raw = readFileSync(fullPath, "utf8");
+  const parsed = JSON.parse(raw);
+  debugLog(config, `baseline loaded from ${fullPath}`);
+  return parsed;
+}
+
+function createBaselineMap(baseline) {
+  const map = new Map();
+  if (!baseline || !Array.isArray(baseline.results)) return map;
+
+  for (const pair of baseline.results) {
+    const pairId = pair?.id;
+    const impls = pair?.implementations;
+    if (!pairId || !Array.isArray(impls)) continue;
+
+    for (const impl of impls) {
+      if (!impl?.name || !impl?.stats || typeof impl.stats.mean !== "number") continue;
+      map.set(`${pairId}|${impl.name}`, impl.stats.mean);
+    }
+  }
+  return map;
+}
+
+function evaluateRegressions(currentReports, baseline, config, issues) {
+  const findings = [];
+  if (!baseline) return findings;
+
+  const baselineMap = createBaselineMap(baseline);
+  if (baselineMap.size === 0) {
+    issues.failOrWarn("baseline has no comparable results[] entries");
+    return findings;
+  }
+
+  for (const row of flattenImplementationRows(currentReports)) {
+    const key = `${row.pairId}|${row.implName}`;
+    if (!baselineMap.has(key)) continue;
+    const baselineMean = baselineMap.get(key);
+    const currentMean = row.stats.mean;
+    const regressionPct = ((baselineMean - currentMean) / baselineMean) * 100;
+    const isRegression = regressionPct > config.maxRegressionPct;
+
+    const finding = {
+      pairId: row.pairId,
+      pairLabel: row.pairLabel,
+      implName: row.implName,
+      baselineMean,
+      currentMean,
+      regressionPct,
+      thresholdPct: config.maxRegressionPct,
+      isRegression,
+    };
+    findings.push(finding);
+
+    if (isRegression) {
+      const msg = `regression ${row.pairId} / ${row.implName}: ${regressionPct.toFixed(
+        2
+      )}% slower than baseline (threshold ${config.maxRegressionPct}%)`;
+      if (config.failOnRegression || config.strict) {
+        throw new Error(msg);
+      }
+      issues.failOrWarn(msg);
+    }
+  }
+
+  return findings;
+}
+
+function printRegressionSummary(regressions, config) {
+  if (config.quiet || regressions.length === 0) return;
+  console.log("\n=== Regression Check ===");
+  console.log(
+    "pair".padEnd(42) +
+      "impl".padEnd(34) +
+      "baseline".padStart(12) +
+      "current".padStart(12) +
+      "delta".padStart(10)
+  );
+  console.log("-".repeat(110));
+  for (const item of regressions) {
+    const delta = percentDelta(item.currentMean, item.baselineMean);
+    console.log(
+      item.pairId.padEnd(42) +
+        item.implName.padEnd(34) +
+        fmtOps(item.baselineMean).padStart(12) +
+        fmtOps(item.currentMean).padStart(12) +
+        fmtPercent(delta).padStart(10)
+    );
+  }
+}
+
+function printWarnings(warnings, config) {
+  if (warnings.length === 0 || config.quiet) return;
+  console.log(`\nwarnings: ${warnings.length}`);
+  for (const warning of warnings) {
+    console.log(`- ${warning}`);
+  }
+}
+
+function buildJsonResult(meta, pairReports, warnings, regressions) {
+  const results = pairReports.map((pair) => {
+    const entry = {
+      id: pair.id,
+      label: pair.label,
+      implementations: pair.implementations.map((impl) => ({
+        name: impl.name,
+        stats: impl.stats,
+      })),
+    };
+
+    if (pair.implementations.length === 2) {
+      const [a, b] = pair.implementations;
+      const faster = a.stats.mean >= b.stats.mean ? a : b;
+      const slower = faster === a ? b : a;
+      entry.relative = {
+        faster: faster.name,
+        slower: slower.name,
+        speedup: faster.stats.mean / slower.stats.mean,
+        deltaPct: percentDelta(faster.stats.mean, slower.stats.mean),
+      };
+    }
+
+    return entry;
+  });
+
+  return {
+    meta,
+    warnings,
+    regressions,
+    results,
+  };
+}
+
+export async function run(argv = process.argv.slice(2)) {
+  const config = parseArgs(argv);
+  const issues = createIssueManager(config);
+
+  const meta = {
+    timestamp: new Date().toISOString(),
+    node: process.version,
+    openssl: process.versions.openssl ?? "unknown",
+    cpuModel: cpus()[0]?.model ?? "unknown",
+    logicalCores: cpus().length,
+    config: {
+      rounds: config.rounds,
+      roundMs: config.roundMs,
+      warmupMs: config.warmupMs,
+      vectors: config.vectors,
+      gc: config.gc,
+    },
+    modes: modeSummary(config),
+    notes: [SIGN_NOTE, OPENMSG_NOTE],
+  };
+
+  printSuiteHeader(meta, config);
+
+  const context = buildContext(config);
+  if (context.vectorCount < 64) {
+    throw new Error(`vector pool must be >= 64, got ${context.vectorCount}`);
+  }
+  debugLog(config, `vector pool ready: ${context.vectorCount}`);
+
+  runPreflightValidation(context, issues, config);
+  debugLog(config, "preflight validation finished");
+
+  const pairReports = [];
+  for (const variant of config.variants) {
+    if (variant === "nocopy") {
+      debugLog(config, "variant=nocopy still copies legacy openMessage input for safety");
+    }
+    const descriptors = buildPairDescriptors(context, variant, issues, config);
+    for (const pair of descriptors) {
+      const report = runPair(pair, config);
+      pairReports.push(report);
+      printPairReport(report, config);
+    }
+  }
+
+  const baseline = readBaseline(config.baseline, config);
+  const regressions = evaluateRegressions(pairReports, baseline, config, issues);
+  printRegressionSummary(regressions, config);
+  printWarnings(issues.warnings, config);
+
+  const output = buildJsonResult(meta, pairReports, issues.warnings, regressions);
+  await writeJsonOutput(output, config);
+  return output;
+}
