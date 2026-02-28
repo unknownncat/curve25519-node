@@ -1,0 +1,19 @@
+{
+  "name": "curve25519-node-bench",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Benchmarks for @unknownncat/curve25519-node vs curve25519-js",
+  "scripts": {
+    "bench": "node --expose-gc bench.mjs",
+    "bench:quick": "node --expose-gc bench.mjs --rounds=8 --roundMs=180 --warmupMs=200",
+    "bench:full": "node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500"
+  },
+  "dependencies": {
+    "@unknownncat/curve25519-node": "file:..",
+    "curve25519-js": "^0.0.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

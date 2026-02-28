@@ -67,6 +67,8 @@
     "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/write-cjs-package-json.mjs",
     "build": "npm run clean && npm run build:esm && npm run build:cjs",
     "test": "npm run build && node --test \"test/*.test.mjs\"",
+    "bench": "npm run build && npm --prefix bench run bench",
+    "bench:quick": "npm run build && npm --prefix bench run bench:quick",
     "prepack": "npm run test",
     "prepublishOnly": "npm run test"
   },

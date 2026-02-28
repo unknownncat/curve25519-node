@@ -19,7 +19,7 @@ Modern **zero-dependency** X25519 + Ed25519 for Node.js using OpenSSL via `node:
 
 ## Why
 
-O projeto original ([curve25519-js](https://github.com/harveyconnor/curve25519-js)) fazia aritmética de campo manual (loops extensos BigInt/Float64) para Curve25519/Ed25519.
+O projeto original ([curve25519-js](https://github.com/harveyconnor/curve25519-js)) faz aritmética de campo manual em `Float64Array` (derivado de TweetNaCl) para Curve25519/Ed25519.
 
 Este pacote troca isso por primitivas nativas do OpenSSL (via `node:crypto`), com foco em:
 
@@ -45,6 +45,8 @@ Consequências:
 - Conversão X25519 public key ↔ Ed25519 public key **não é exposta** por `node:crypto`.
 - `opt_random` (64 bytes) do legado **não é suportado** em Ed25519 com `node:crypto`.
   - O compat layer aceita um 3º argumento apenas por compatibilidade de chamada, mas **sempre lança erro** se ele for fornecido.
+- As assinaturas Ed25519 aqui são determinísticas (comportamento padrão do OpenSSL para Ed25519).
+- No legado, `openMessage` pode alterar o `signedMsg` recebido (bit de sinal); nesta implementação, as entradas não são modificadas.
 
 ---
 
@@ -105,9 +107,9 @@ const sig = ed25519.sign(seed, Buffer.from("hello"));
 ### Subpath imports (opcional)
 
 ```ts
-import { x25519 } from "@unknownncat/curve25519-node/x25519";
-import { ed25519 } from "@unknownncat/curve25519-node/ed25519";
-import { asBytes32, asBytes64 } from "@unknownncat/curve25519-node/types";
+import { generateKeyPair as xGenerateKeyPair, sharedKey } from "@unknownncat/curve25519-node/x25519";
+import { sign, verify } from "@unknownncat/curve25519-node/ed25519";
+import type { Bytes32, Bytes64 } from "@unknownncat/curve25519-node/types";
 ```
 
 ---
@@ -196,6 +198,19 @@ Cobertura inclui vetores RFC:
 
 - X25519: RFC 7748
 - Ed25519: RFC 8032
+
+---
+
+## Benchmarks
+
+Há um subprojeto isolado em `bench/` para comparar este pacote com `curve25519-js` sem adicionar dependências ao pacote principal.
+
+```bash
+npm run build
+cd bench
+npm install
+npm run bench
+```
 
 ---
 
