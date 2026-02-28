@@ -1,9 +1,9 @@
 # @unknownncat/curve25519-node
 
-[![npm](https://img.shields.io/npm/v/%40unknownncat%2Fcurve25519-node)](https://www.npmjs.com/package/@unknownncat/curve25519-node)
-[![downloads](https://img.shields.io/npm/dm/%40unknownncat%2Fcurve25519-node)](https://www.npmjs.com/package/@unknownncat/curve25519-node)
+[![npm](https://img.shields.io/npm/v/@unknownncat/curve25519-node)](https://www.npmjs.com/package/@unknownncat/curve25519-node)
+[![downloads](https://img.shields.io/badge/downloads-new%20package-lightgrey)](https://www.npmjs.com/package/@unknownncat/curve25519-node)
 [![types](https://img.shields.io/badge/types-included-blue)](./dist/index.d.ts)
-[![license](https://img.shields.io/github/license/unknownncat/curve25519-node)](./LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 ![runtime deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen)
 ![esm+cjs](https://img.shields.io/badge/ESM%20%2B%20CJS-compatible-blue)
