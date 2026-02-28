@@ -192,6 +192,49 @@ npm install
 npm run bench
 ```
 
+### Real benchmark snapshot (`npm run bench:full`) on GitHub Codespaces`
+
+Command:
+
+```bash
+node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --variants=raw,cached,nocopy,copy --verifyDuringBench --verifyEvery=64
+```
+
+Environment:
+
+- Node: `v24.11.1`
+- OpenSSL: `3.5.4`
+- CPU: `AMD EPYC 7763 64-Core Processor`
+- Logical cores: `4`
+- Vectors: `64`
+
+Selected results (mean ops/s):
+
+| Variant | Operation                    | Modern | Legacy (`curve25519-js`) | Speedup |
+| ------- | ---------------------------- | -----: | -----------------------: | ------: |
+| raw     | x25519.generateKeyPair       | 14,201 |                    1,627 |   8.73x |
+| raw     | x25519.sharedKey             |  9,985 |                    1,634 |   6.11x |
+| raw     | ed25519.sign (msg32)         | 11,174 |                      145 |  77.08x |
+| raw     | ed25519.verify (msg32)       |  7,413 |                      146 |  50.76x |
+| raw     | ed25519.signMessage (msg256) | 10,952 |                      145 |  75.45x |
+| raw     | ed25519.openMessage (msg256) |  7,199 |                      143 |  50.30x |
+| cached  | x25519.generateKeyPair       | 48,553 |                    1,624 |  29.90x |
+| cached  | x25519.sharedKey             | 25,283 |                    1,641 |  15.41x |
+| cached  | ed25519.sign (msg32)         | 24,345 |                      142 | 171.00x |
+| cached  | ed25519.verify (msg32)       |  8,184 |                      145 |  56.42x |
+| cached  | ed25519.signMessage (msg256) | 23,410 |                      135 | 173.56x |
+| cached  | ed25519.openMessage (msg256) |  8,118 |                      145 |  56.07x |
+| nocopy  | x25519.sharedKey             | 10,383 |                    1,617 |   6.42x |
+| nocopy  | ed25519.sign (msg32)         | 11,170 |                      145 |  77.18x |
+| copy    | x25519.sharedKey             | 10,292 |                    1,617 |   6.37x |
+| copy    | ed25519.sign (msg32)         | 10,922 |                      145 |  75.40x |
+
+Notes:
+
+- `cached` isolates cryptographic throughput better by reusing `KeyObject` on the modern side.
+- `raw` / `copy` / `nocopy` are closer to API-level end-to-end cost.
+- `sign`/`verify` comparisons measure API throughput, not cryptographic equivalence (`axlsign` vs Ed25519 standard).
+
 ---
 
 ## License
