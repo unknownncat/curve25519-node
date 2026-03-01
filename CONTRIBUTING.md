@@ -36,6 +36,14 @@ Validação completa local:
 npm run ci
 ```
 
+Checagens extras de robustez:
+
+```bash
+npm run audit
+npm run audit:prod
+npm run release:check
+```
+
 ## Escopo de mudanças
 
 - Evite misturar refactor grande com correção funcional no mesmo PR.

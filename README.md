@@ -396,6 +396,14 @@ Validação local completa:
 npm run ci
 ```
 
+Checagens extras de robustez/supply-chain:
+
+```bash
+npm run audit
+npm run audit:prod
+npm run release:check
+```
+
 ---
 
 ## Licença

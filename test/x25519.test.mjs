@@ -119,3 +119,23 @@ test("isAllZero32 detects zero and non-zero values", () => {
   assert.equal(x25519.isAllZero32(zero), true);
   assert.equal(x25519.isAllZero32(nonZero), false);
 });
+
+test("sharedKeyStrict rejects invalid/low-order peer inputs", () => {
+  const alicePrivate = asBytes32(
+    hexToBytes("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a"),
+  );
+  const invalidPeer = asBytes32(new Uint8Array(32));
+
+  let rawOutput = null;
+  try {
+    rawOutput = x25519.sharedKey(alicePrivate, invalidPeer);
+  } catch {
+    rawOutput = null;
+  }
+
+  if (rawOutput !== null) {
+    assert.equal(x25519.isAllZero32(rawOutput), true);
+  }
+
+  assert.throws(() => x25519.sharedKeyStrict(alicePrivate, invalidPeer));
+});

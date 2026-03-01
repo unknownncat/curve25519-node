@@ -1,4 +1,5 @@
-import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
 import { createRequire } from "node:module";
 import {
   asBytes32,
@@ -15,9 +16,9 @@ const SELF_PACKAGE_NAME = "@unknownncat/curve25519-node";
 const requireBase =
   typeof __filename === "string"
     ? __filename
-    : typeof process.argv[1] === "string"
+    : typeof process.argv[1] === "string" && isAbsolute(process.argv[1])
       ? process.argv[1]
-      : join(process.cwd(), "index.js");
+      : join(process.cwd(), "package.json");
 
 const nodeRequire = createRequire(requireBase);
 
@@ -25,20 +26,43 @@ let wasmModulePath: string | undefined;
 
 let wasmAxl: typeof WasmAxlModule | undefined;
 
+function resolveWasmModulePath(): string {
+  const candidates: string[] = [];
+
+  try {
+    const packageJsonPath = nodeRequire.resolve(`${SELF_PACKAGE_NAME}/package.json`);
+    candidates.push(
+      join(dirname(packageJsonPath), "dist", "internal", "axlsign-wasm", "axlsign_wasm.js"),
+    );
+  } catch {
+    // Fall back to local development paths below.
+  }
+
+  if (typeof __dirname === "string") {
+    candidates.push(join(__dirname, "internal", "axlsign-wasm", "axlsign_wasm.js"));
+  }
+
+  candidates.push(join(process.cwd(), "dist", "internal", "axlsign-wasm", "axlsign_wasm.js"));
+  candidates.push(join(process.cwd(), "src", "internal", "axlsign-wasm", "axlsign_wasm.js"));
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    "Unable to locate axlsign WASM module. Run `npm run build` before using axlsign in local dev.",
+  );
+}
+
 function getWasmAxl(): typeof WasmAxlModule {
   if (wasmAxl !== undefined) {
     return wasmAxl;
   }
 
   if (wasmModulePath === undefined) {
-    const packageJsonPath = nodeRequire.resolve(`${SELF_PACKAGE_NAME}/package.json`);
-    wasmModulePath = join(
-      dirname(packageJsonPath),
-      "dist",
-      "internal",
-      "axlsign-wasm",
-      "axlsign_wasm.js",
-    );
+    wasmModulePath = resolveWasmModulePath();
   }
 
   // Lazy-load WASM bindings to keep modern-only imports lightweight.

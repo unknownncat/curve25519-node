@@ -21,3 +21,14 @@ If private reporting is not available, open a public issue without sensitive det
 
 - Cryptographic flaws, incorrect input validation, and integrity/confidentiality issues are high priority.
 - Include package version, runtime environment, and reproducible steps.
+
+## Maintainer Security Checks
+
+Before publishing a release, run:
+
+```bash
+npm run ci
+npm run audit
+npm run audit:prod
+npm run release:check
+```
