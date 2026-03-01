@@ -25,19 +25,19 @@ export function assertBytes64(value: Uint8Array, name = "value"): asserts value 
 
 export function asBytes32(value: Uint8Array, name = "value"): Bytes32 {
   assertBytes32(value, name);
-  return value as Bytes32;
+  return value;
 }
 
 export function asBytes64(value: Uint8Array, name = "value"): Bytes64 {
   assertBytes64(value, name);
-  return value as Bytes64;
+  return value;
 }
 
 export function assertNoOptRandom(optRandom: unknown, fnName: string): void {
   if (optRandom !== undefined) {
     throw new Error(
       `${fnName} does not support opt_random with node:crypto Ed25519. ` +
-        "Remove the third argument and use deterministic Ed25519 signing."
+        "Remove the third argument and use deterministic Ed25519 signing.",
     );
   }
 }

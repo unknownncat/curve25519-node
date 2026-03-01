@@ -1,5 +1,7 @@
 # Benchmarks (subprojeto isolado)
 
+> English version: [README.en.md](./README.en.md)
+
 Esta pasta e um projeto separado para benchmark.  
 Nao adiciona dependencias runtime ao pacote principal.
 Este subprojeto e privado (`private: true`) e nao deve ser publicado no npm.

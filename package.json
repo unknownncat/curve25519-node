@@ -76,14 +76,26 @@
     "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/write-cjs-package-json.mjs",
     "build:copy-wasm": "node scripts/copy-axlsign-wasm.mjs",
     "build": "npm run clean && npm run build:wasm && npm run build:esm && npm run build:cjs && npm run build:copy-wasm",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
     "test": "npm run build && node --test \"test/*.test.mjs\"",
+    "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "bench": "npm run build && npm --prefix bench run bench",
     "bench:quick": "npm run build && npm --prefix bench run bench:quick",
-    "prepack": "npm run test",
-    "prepublishOnly": "npm run test"
+    "prepack": "npm run ci",
+    "prepublishOnly": "npm run ci"
   },
   "devDependencies": {
+    "@eslint/js": "^9.37.0",
     "@types/node": "^22.18.6",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript-eslint": "^8.46.1",
     "typescript": "^5.9.2"
   }
 }

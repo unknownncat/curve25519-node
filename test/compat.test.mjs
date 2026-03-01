@@ -29,7 +29,10 @@ test("top-level aliases map to namespaces", () => {
 
   assert.equal(bytesToHex(kpXNs.public), bytesToHex(kpXAlias.public));
   assert.equal(bytesToHex(kpXNs.public), bytesToHex(kpXExplicit.public));
-  assert.equal(bytesToHex(sharedKey(kpXNs.private, kpXNs.public)), bytesToHex(x25519.sharedKey(kpXNs.private, kpXNs.public)));
+  assert.equal(
+    bytesToHex(sharedKey(kpXNs.private, kpXNs.public)),
+    bytesToHex(x25519.sharedKey(kpXNs.private, kpXNs.public)),
+  );
 
   const signature = sign(seedEd, msg);
   assert.equal(verify(kpEd.public, msg, signature), true);

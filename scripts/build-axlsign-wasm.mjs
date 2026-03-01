@@ -29,7 +29,7 @@ const result = spawnSync("wasm-pack", args, {
 if (result.error) {
   throw new Error(
     `failed to execute wasm-pack: ${result.error.message}. ` +
-      "Install Rust + wasm-pack and retry (https://rustwasm.github.io/wasm-pack/installer/)."
+      "Install Rust + wasm-pack and retry (https://rustwasm.github.io/wasm-pack/installer/).",
   );
 }
 

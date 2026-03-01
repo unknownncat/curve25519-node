@@ -66,11 +66,7 @@ import { asBytes32, axlsign } from "@unknownncat/curve25519-node";
 
 const seed = asBytes32(new Uint8Array(32));
 const kp = axlsign.generateKeyPair(seed); // X25519 keypair compatível com curve25519-js
-const sig = axlsign.sign(
-  kp.private,
-  new TextEncoder().encode("hello"),
-  new Uint8Array(64),
-);
+const sig = axlsign.sign(kp.private, new TextEncoder().encode("hello"), new Uint8Array(64));
 const ok = axlsign.verify(kp.public, new TextEncoder().encode("hello"), sig);
 ```
 
@@ -309,6 +305,20 @@ Com isso, `npm run build` executa:
 1. `wasm-pack build` (`wasm/axlsign`)
 2. `tsc` ESM + CJS
 3. cópia dos artefatos WASM para `dist/internal/axlsign-wasm`
+
+---
+
+## Contribuição
+
+- Guia: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Código de conduta: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- Segurança: [SECURITY.md](./SECURITY.md)
+
+Validação local completa:
+
+```bash
+npm run ci
+```
 
 ---
 

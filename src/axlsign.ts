@@ -1,4 +1,10 @@
-import { asBytes32, asBytes64, assertBytes32, assertBytes64, assertUint8Array } from "./internal/assert.js";
+import {
+  asBytes32,
+  asBytes64,
+  assertBytes32,
+  assertBytes64,
+  assertUint8Array,
+} from "./internal/assert.js";
 import type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
 import * as wasmAxl from "./internal/axlsign-wasm/axlsign_wasm.js";
 
@@ -77,7 +83,11 @@ export function verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes
 /**
  * Returns signature || message (axlsign mode).
  */
-export function signMessage(secretKey32: Bytes32, msg: Uint8Array, opt_random?: Uint8Array): Uint8Array {
+export function signMessage(
+  secretKey32: Bytes32,
+  msg: Uint8Array,
+  opt_random?: Uint8Array,
+): Uint8Array {
   assertBytes32(secretKey32, "secretKey32");
   assertUint8Array(msg, "msg");
   assertOptionalRandom64(opt_random, "signMessage");

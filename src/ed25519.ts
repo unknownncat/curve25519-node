@@ -1,6 +1,16 @@
 import { createPublicKey, sign as cryptoSign, verify as cryptoVerify } from "node:crypto";
-import { asBytes64, assertBytes32, assertBytes64, assertUint8Array, toBufferView } from "./internal/assert.js";
-import { keyFromEd25519Private, keyFromEd25519Public, rawPublicFromEd25519Spki } from "./internal/der.js";
+import {
+  asBytes64,
+  assertBytes32,
+  assertBytes64,
+  assertUint8Array,
+  toBufferView,
+} from "./internal/assert.js";
+import {
+  keyFromEd25519Private,
+  keyFromEd25519Public,
+  rawPublicFromEd25519Spki,
+} from "./internal/der.js";
 import type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
 
 /**
@@ -34,7 +44,10 @@ export function sign(secretSeed32: Bytes32, msg: Uint8Array): Bytes64 {
   if (signature.byteLength !== 64) {
     throw new Error(`Ed25519 signature must be 64 bytes, received ${signature.byteLength}`);
   }
-  return asBytes64(new Uint8Array(signature.buffer, signature.byteOffset, signature.byteLength), "signature");
+  return asBytes64(
+    new Uint8Array(signature.buffer, signature.byteOffset, signature.byteLength),
+    "signature",
+  );
 }
 
 /**
@@ -49,7 +62,7 @@ export function verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes
     null,
     toBufferView(msg),
     keyFromEd25519Public(publicKey32),
-    toBufferView(signature64)
+    toBufferView(signature64),
   );
 }
 

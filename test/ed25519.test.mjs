@@ -7,7 +7,7 @@ const bytesToHex = (bytes) => Buffer.from(bytes).toString("hex");
 
 test("RFC 8032 test vector 1: empty message", () => {
   const seed = asBytes32(
-    hexToBytes("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+    hexToBytes("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"),
   );
   const expectedPublic = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
   const expectedSignature =
@@ -20,12 +20,19 @@ test("RFC 8032 test vector 1: empty message", () => {
 
   assert.equal(bytesToHex(publicKey32), expectedPublic);
   assert.equal(bytesToHex(signature64), expectedSignature);
-  assert.equal(ed25519.verify(asBytes32(hexToBytes(expectedPublic)), msg, asBytes64(hexToBytes(expectedSignature))), true);
+  assert.equal(
+    ed25519.verify(
+      asBytes32(hexToBytes(expectedPublic)),
+      msg,
+      asBytes64(hexToBytes(expectedSignature)),
+    ),
+    true,
+  );
 });
 
 test("RFC 8032 test vector 2: one-byte message", () => {
   const seed = asBytes32(
-    hexToBytes("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb")
+    hexToBytes("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb"),
   );
   const expectedPublic = "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c";
   const expectedSignature =
@@ -43,7 +50,7 @@ test("RFC 8032 test vector 2: one-byte message", () => {
 
 test("signMessage returns signature || message and openMessage recovers payload", () => {
   const seed = asBytes32(
-    hexToBytes("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb")
+    hexToBytes("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb"),
   );
   const publicKey32 = ed25519.publicKey(seed);
   const msg = hexToBytes("48656c6c6f2c2065643235353139");
@@ -60,7 +67,7 @@ test("signMessage returns signature || message and openMessage recovers payload"
 
 test("openMessage returns null on invalid signature", () => {
   const seed = asBytes32(
-    hexToBytes("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb")
+    hexToBytes("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb"),
   );
   const publicKey32 = ed25519.publicKey(seed);
   const msg = hexToBytes("001122334455");
@@ -80,7 +87,10 @@ test("runtime validation rejects wrong input sizes", () => {
   assert.throws(() => ed25519.sign(seed31, msg), /32 bytes/);
   assert.throws(
     () => ed25519.verify(asBytes32(hexToBytes("11".repeat(32))), msg, sig63),
-    /64 bytes/
+    /64 bytes/,
   );
-  assert.throws(() => ed25519.verify(pub31, msg, asBytes64(hexToBytes("22".repeat(64)))), /32 bytes/);
+  assert.throws(
+    () => ed25519.verify(pub31, msg, asBytes64(hexToBytes("22".repeat(64)))),
+    /32 bytes/,
+  );
 });

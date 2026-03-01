@@ -40,7 +40,10 @@ export function sharedKey(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32 {
   if (shared.byteLength !== 32) {
     throw new Error(`X25519 shared secret must be 32 bytes, received ${shared.byteLength}`);
   }
-  return asBytes32(new Uint8Array(shared.buffer, shared.byteOffset, shared.byteLength), "sharedKey");
+  return asBytes32(
+    new Uint8Array(shared.buffer, shared.byteOffset, shared.byteLength),
+    "sharedKey",
+  );
 }
 
 /**

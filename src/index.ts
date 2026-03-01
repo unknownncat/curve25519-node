@@ -2,7 +2,7 @@ import { assertNoOptRandom, assertUint8Array } from "./internal/assert.js";
 import * as axlsignApi from "./axlsign.js";
 import * as ed25519Api from "./ed25519.js";
 import * as x25519Api from "./x25519.js";
-import type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
+import type { Bytes32, Bytes64 } from "./types.js";
 
 export { asBytes32, asBytes64, assertBytes32, assertBytes64 } from "./internal/assert.js";
 export type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
@@ -75,7 +75,11 @@ export function sign(secretSeed32: Bytes32, msg: Uint8Array, opt_random?: Uint8A
  * Compatibility wrapper for Ed25519 signed-message mode.
  * opt_random from legacy curve25519-js/axlsign is intentionally unsupported.
  */
-export function signMessage(secretSeed32: Bytes32, msg: Uint8Array, opt_random?: Uint8Array): Uint8Array {
+export function signMessage(
+  secretSeed32: Bytes32,
+  msg: Uint8Array,
+  opt_random?: Uint8Array,
+): Uint8Array {
   assertUint8Array(msg, "msg");
   assertNoOptRandom(opt_random, "signMessage");
   return ed25519.signMessage(secretSeed32, msg);

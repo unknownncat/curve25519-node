@@ -1,0 +1,8 @@
+bench/**
+dist/
+node_modules/
+bench/node_modules/
+bench/results/
+wasm/**/target/
+src/internal/axlsign-wasm/
+package-lock.json

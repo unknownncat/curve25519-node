@@ -7,11 +7,11 @@ const bytesToHex = (bytes) => Buffer.from(bytes).toString("hex");
 
 test("axlsign publicKey/sharedKey match known vectors", () => {
   const aliceSeed = asBytes32(
-    hexToBytes("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a")
+    hexToBytes("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a"),
   );
   const expectedAlicePublic = "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a";
   const bobPublic = asBytes32(
-    hexToBytes("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f")
+    hexToBytes("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f"),
   );
   const expectedShared = "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742";
 
@@ -24,24 +24,27 @@ test("axlsign publicKey/sharedKey match known vectors", () => {
 
 test("axlsign generateKeyPair returns clamped private key", () => {
   const seed = asBytes32(
-    hexToBytes("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a")
+    hexToBytes("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a"),
   );
 
   const pair = axlsign.generateKeyPair(seed);
 
   assert.equal(
     bytesToHex(pair.private),
-    "70076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c6a"
+    "70076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c6a",
   );
-  assert.equal(bytesToHex(pair.public), "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a");
+  assert.equal(
+    bytesToHex(pair.public),
+    "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a",
+  );
 });
 
 test("axlsign deterministic sign/verify matches known signature", () => {
   const secret = asBytes32(
-    hexToBytes("70076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c6a")
+    hexToBytes("70076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c6a"),
   );
   const publicKey32 = asBytes32(
-    hexToBytes("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a")
+    hexToBytes("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a"),
   );
   const msg = hexToBytes("68656c6c6f20776f726c64");
   const expectedSignature =
@@ -56,10 +59,10 @@ test("axlsign deterministic sign/verify matches known signature", () => {
 
 test("axlsign randomized sign(opt_random) matches known signature", () => {
   const secret = asBytes32(
-    hexToBytes("70076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c6a")
+    hexToBytes("70076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c6a"),
   );
   const publicKey32 = asBytes32(
-    hexToBytes("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a")
+    hexToBytes("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a"),
   );
   const msg = hexToBytes("68656c6c6f20776f726c64");
   const rnd = hexToBytes("11".repeat(64));
@@ -75,10 +78,10 @@ test("axlsign randomized sign(opt_random) matches known signature", () => {
 
 test("axlsign signMessage/openMessage roundtrip and invalid signature handling", () => {
   const secret = asBytes32(
-    hexToBytes("70076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c6a")
+    hexToBytes("70076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c6a"),
   );
   const publicKey32 = asBytes32(
-    hexToBytes("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a")
+    hexToBytes("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a"),
   );
   const msg = hexToBytes("001122334455");
 
@@ -97,16 +100,13 @@ test("axlsign runtime validation rejects wrong input sizes", () => {
   const msg = hexToBytes("deadbeef");
 
   assert.throws(() => axlsign.publicKey(sk31), /32 bytes/);
-  assert.throws(
-    () => axlsign.sharedKey(asBytes32(hexToBytes("11".repeat(32))), pk31),
-    /32 bytes/
-  );
+  assert.throws(() => axlsign.sharedKey(asBytes32(hexToBytes("11".repeat(32))), pk31), /32 bytes/);
   assert.throws(
     () => axlsign.sign(asBytes32(hexToBytes("22".repeat(32))), msg, hexToBytes("33".repeat(63))),
-    /64 bytes/
+    /64 bytes/,
   );
   assert.throws(
     () => axlsign.verify(asBytes32(hexToBytes("44".repeat(32))), msg, hexToBytes("55".repeat(63))),
-    /64 bytes/
+    /64 bytes/,
   );
 });
