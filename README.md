@@ -66,7 +66,11 @@ import { asBytes32, axlsign } from "@unknownncat/curve25519-node";
 
 const seed = asBytes32(new Uint8Array(32));
 const kp = axlsign.generateKeyPair(seed); // X25519 keypair compatível com curve25519-js
-const sig = axlsign.sign(kp.private, new TextEncoder().encode("hello"), new Uint8Array(64));
+const sig = axlsign.sign(
+  kp.private,
+  new TextEncoder().encode("hello"),
+  new Uint8Array(64),
+);
 const ok = axlsign.verify(kp.public, new TextEncoder().encode("hello"), sig);
 ```
 
@@ -115,14 +119,14 @@ Este pacote suporta dois modos:
 - **moderno (recomendado):** `x25519` + `ed25519` via `node:crypto`
 - **legado:** `axlsign` via WASM para compatibilidade com `curve25519-js`
 
-| Recurso | `curve25519-js` | `curve25519-node` |
-| --- | --- | --- |
-| Esquema de assinatura (moderno) | axlsign | Ed25519 (padrão) |
-| Esquema de assinatura (legado) | axlsign | axlsign (namespace `axlsign`) |
-| Acordo de chave | X25519 | X25519 |
-| Mesma chave para assinatura + ECDH | sim | apenas no namespace `axlsign` |
-| `opt_random` nas APIs de assinatura | sim | sim no `axlsign`, não no top-level/`ed25519` |
-| Backend OpenSSL | não | sim |
+| Recurso                             | `curve25519-js` | `curve25519-node`                            |
+| ----------------------------------- | --------------- | -------------------------------------------- |
+| Esquema de assinatura (moderno)     | axlsign         | Ed25519 (padrão)                             |
+| Esquema de assinatura (legado)      | axlsign         | axlsign (namespace `axlsign`)                |
+| Acordo de chave                     | X25519          | X25519                                       |
+| Mesma chave para assinatura + ECDH  | sim             | apenas no namespace `axlsign`                |
+| `opt_random` nas APIs de assinatura | sim             | sim no `axlsign`, não no top-level/`ed25519` |
+| Backend OpenSSL                     | não             | sim                                          |
 
 Importante:
 
@@ -163,13 +167,13 @@ Helpers (validam sem copiar):
 
 ## Mapa de RFCs (uso no projeto)
 
-| RFC | Seções usadas | Uso no projeto | Onde no código |
-| --- | --- | --- | --- |
-| RFC 7748 (X25519) | Seção 5 (`The X25519 and X448 Functions`) | Regras de clamping/decoding do escalar e comportamento da função X25519 (zera 3 bits baixos, zera bit mais alto, seta o segundo bit mais alto). | `src/x25519.ts` |
-| RFC 7748 (X25519) | Seção 5.2 (`Test Vectors`), Seção 6.1 (`Diffie-Hellman / Curve25519`) | Vetores oficiais para validação de interoperabilidade e corretude. | `test/x25519.test.mjs` |
-| RFC 8032 (Ed25519) | Seção 5.1.5 (`Key Generation`), 5.1.6 (`Sign`), 5.1.7 (`Verify`) | Semântica de keygen/sign/verify Ed25519 (executada por OpenSSL via `node:crypto`). | `src/ed25519.ts` |
-| RFC 8032 (Ed25519) | Seção 7.1 (`Test Vectors for Ed25519`) | Vetores determinísticos para validação de chave pública e assinatura. | `test/ed25519.test.mjs` |
-| RFC 8410 (X25519/Ed25519 em PKIX) | Seção 3 (identificadores de algoritmo), Seção 4 (`Subject Public Key Fields`), Seção 7 (`Private Key Format`) | Estrutura DER para import/export de chaves raw de 32 bytes em SPKI/PKCS#8 com OIDs de X25519 e Ed25519. | `src/internal/der.ts` |
+| RFC                               | Seções usadas                                                                                                 | Uso no projeto                                                                                                                                  | Onde no código          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| RFC 7748 (X25519)                 | Seção 5 (`The X25519 and X448 Functions`)                                                                     | Regras de clamping/decoding do escalar e comportamento da função X25519 (zera 3 bits baixos, zera bit mais alto, seta o segundo bit mais alto). | `src/x25519.ts`         |
+| RFC 7748 (X25519)                 | Seção 5.2 (`Test Vectors`), Seção 6.1 (`Diffie-Hellman / Curve25519`)                                         | Vetores oficiais para validação de interoperabilidade e corretude.                                                                              | `test/x25519.test.mjs`  |
+| RFC 8032 (Ed25519)                | Seção 5.1.5 (`Key Generation`), 5.1.6 (`Sign`), 5.1.7 (`Verify`)                                              | Semântica de keygen/sign/verify Ed25519 (executada por OpenSSL via `node:crypto`).                                                              | `src/ed25519.ts`        |
+| RFC 8032 (Ed25519)                | Seção 7.1 (`Test Vectors for Ed25519`)                                                                        | Vetores determinísticos para validação de chave pública e assinatura.                                                                           | `test/ed25519.test.mjs` |
+| RFC 8410 (X25519/Ed25519 em PKIX) | Seção 3 (identificadores de algoritmo), Seção 4 (`Subject Public Key Fields`), Seção 7 (`Private Key Format`) | Estrutura DER para import/export de chaves raw de 32 bytes em SPKI/PKCS#8 com OIDs de X25519 e Ed25519.                                         | `src/internal/der.ts`   |
 
 Referências indiretas por estrutura ASN.1/PKIX:
 
@@ -233,12 +237,12 @@ npm install
 npm run bench
 ```
 
-### Snapshot real de benchmark (`npm run bench:full`) no GitHub Codespaces
+### Snapshot real de benchmark (`npm run bench:ci`) no GitHub Codespaces
 
 Comando:
 
 ```bash
-node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --variants=raw,cached,nocopy,copy --verifyDuringBench --verifyEvery=64
+node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --vectors=64 --variants=raw,cached --strict --verifyEvery=64 --jsonFile=results/bench-results.json
 ```
 
 Ambiente:
@@ -249,32 +253,45 @@ Ambiente:
 - Cores lógicos: `4`
 - Vetores: `64`
 
-Resultados selecionados (média em ops/s):
+### Tabela 1 - API moderna (`x25519` + `ed25519`)
 
-| Variante | Operação | Moderno | Legado (`curve25519-js`) | Speedup |
-| --- | --- | ---: | ---: | ---: |
-| raw | x25519.generateKeyPair | 14,201 | 1,627 | 8.73x |
-| raw | x25519.sharedKey | 9,985 | 1,634 | 6.11x |
-| raw | ed25519.sign (msg32) | 11,174 | 145 | 77.08x |
-| raw | ed25519.verify (msg32) | 7,413 | 146 | 50.76x |
-| raw | ed25519.signMessage (msg256) | 10,952 | 145 | 75.45x |
-| raw | ed25519.openMessage (msg256) | 7,199 | 143 | 50.30x |
-| cached | x25519.generateKeyPair | 48,553 | 1,624 | 29.90x |
-| cached | x25519.sharedKey | 25,283 | 1,641 | 15.41x |
-| cached | ed25519.sign (msg32) | 24,345 | 142 | 171.00x |
-| cached | ed25519.verify (msg32) | 8,184 | 145 | 56.42x |
-| cached | ed25519.signMessage (msg256) | 23,410 | 135 | 173.56x |
-| cached | ed25519.openMessage (msg256) | 8,118 | 145 | 56.07x |
-| nocopy | x25519.sharedKey | 10,383 | 1,617 | 6.42x |
-| nocopy | ed25519.sign (msg32) | 11,170 | 145 | 77.18x |
-| copy | x25519.sharedKey | 10,292 | 1,617 | 6.37x |
-| copy | ed25519.sign (msg32) | 10,922 | 145 | 75.40x |
+`sign`/`verify` abaixo comparam throughput de API, não equivalência criptográfica (Ed25519 vs axlsign legado).
+
+| Operação                       | Moderno raw | Legado raw (`curve25519-js`) | Speedup raw | Moderno cached | Legado cached (`curve25519-js`) | Speedup cached |
+| ------------------------------ | ----------: | ---------------------------: | ----------: | -------------: | ------------------------------: | -------------: |
+| `x25519.generateKeyPair`       |      14,378 |                        1,591 |       9.04x |         41,120 |                           1,478 |         27.83x |
+| `x25519.sharedKey`             |       9,970 |                        1,591 |       6.27x |         23,995 |                           1,554 |         15.44x |
+| `ed25519.sign (msg32)`         |      11,273 |                          143 |      78.95x |         23,696 |                             133 |        178.10x |
+| `ed25519.sign (msg1024)`       |      10,800 |                          138 |      78.07x |         22,502 |                             147 |        152.92x |
+| `ed25519.verify (msg32)`       |       7,280 |                          136 |      53.36x |          8,271 |                             155 |         53.37x |
+| `ed25519.verify (msg1024)`     |       7,160 |                          132 |      54.33x |          8,159 |                             154 |         52.90x |
+| `ed25519.signMessage (msg256)` |      10,624 |                          131 |      81.09x |         23,304 |                             148 |        156.97x |
+| `ed25519.openMessage (msg256)` |       6,574 |                          124 |      52.93x |          8,129 |                             154 |         52.64x |
+
+### Tabela 2 - Compatibilidade `axlsign` (equivalente ao `curve25519-js`)
+
+Aqui a comparação é de mesmo esquema criptográfico (equivalência + throughput).
+
+| Operação                                  | Moderno raw | Legado raw (`curve25519-js`) | Speedup raw | Moderno cached | Legado cached (`curve25519-js`) | Speedup cached |
+| ----------------------------------------- | ----------: | ---------------------------: | ----------: | -------------: | ------------------------------: | -------------: |
+| `axlsign.generateKeyPair`                 |       8,429 |                        1,583 |       5.33x |          8,384 |                           1,585 |          5.29x |
+| `axlsign.sharedKey`                       |       8,452 |                        1,583 |       5.34x |          8,396 |                           1,570 |          5.35x |
+| `axlsign.sign (msg32)`                    |       3,973 |                          144 |      27.61x |          3,952 |                             140 |         28.28x |
+| `axlsign.sign (msg32,opt_random)`         |       3,969 |                          147 |      27.03x |          3,984 |                             139 |         28.58x |
+| `axlsign.sign (msg1024)`                  |       3,881 |                          143 |      27.16x |          3,864 |                             139 |         27.72x |
+| `axlsign.verify (msg32)`                  |       6,527 |                          146 |      44.70x |          6,534 |                             143 |         45.72x |
+| `axlsign.verify (msg32,opt_random)`       |       6,506 |                          144 |      45.07x |          6,469 |                             141 |         45.80x |
+| `axlsign.verify (msg1024)`                |       6,361 |                          141 |      45.03x |          6,337 |                             135 |         46.92x |
+| `axlsign.signMessage (msg256)`            |       3,902 |                          140 |      27.79x |          3,935 |                             141 |         27.98x |
+| `axlsign.signMessage (msg256,opt_random)` |       3,885 |                          142 |      27.40x |          3,864 |                             145 |         26.60x |
+| `axlsign.openMessage (msg256)`            |       6,441 |                          138 |      46.57x |          6,300 |                             131 |         47.93x |
+| `axlsign.openMessage (msg256,opt_random)` |       6,362 |                          141 |      45.24x |          6,285 |                             130 |         48.22x |
 
 Notas:
 
-- `cached` isola melhor o throughput criptográfico por reuso de `KeyObject` no lado moderno.
-- `raw` / `copy` / `nocopy` ficam mais próximos do custo fim-a-fim de API.
-- comparações de `sign`/`verify` medem throughput de API, não equivalência criptográfica (`axlsign` vs Ed25519 padrão).
+- `raw` inclui custo fim-a-fim da API.
+- `cached` reduz overhead de setup para evidenciar melhor o throughput criptográfico.
+- Fonte dos números: saída JSON de `bench:ci` (`results/bench-results.json`).
 
 ---
 

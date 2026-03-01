@@ -1,7 +1,7 @@
 export const SUPPORTED_VARIANTS = ["raw", "cached", "copy", "nocopy"];
 
 const DEFAULTS = {
-  rounds: 12,
+  rounds: 16,
   roundMs: 250,
   warmupMs: 300,
   vectors: 64,

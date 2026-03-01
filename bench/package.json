@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Benchmarks for @unknownncat/curve25519-node vs curve25519-js",
   "scripts": {
+    "compat:axlsign": "node axlsign-compat-check.mjs --iterations=512",
     "bench": "node --expose-gc bench.mjs --variants=raw",
     "bench:quick": "node --expose-gc bench.mjs --rounds=8 --roundMs=180 --warmupMs=200 --variants=raw",
     "bench:full": "node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --variants=raw,cached,nocopy,copy --verifyDuringBench --verifyEvery=64",
