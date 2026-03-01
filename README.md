@@ -133,12 +133,35 @@ Helpers (validation without copy):
 
 ---
 
-## RFC Coverage
+Aqui está a tabela organizada e corrigida (com colunas alinhadas e sem quebra extra). Também removi a coluna vazia no final e padronizei os títulos.
 
-Test vectors included for:
+## RFC Map (what is used in this project)
 
-- **RFC 7748** (X25519)
-- **RFC 8032** (Ed25519)
+| RFC                                 | Sections used                                                                                             | How it is used here                                                                                                         | Where in project        |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| RFC 7748 (X25519)                   | Section 5 — _The X25519 and X448 Functions_                                                               | Scalar decoding / clamping and X25519 behavior (clear low 3 bits, clear top bit, set second-top bit) following X25519 rules | `src/x25519.ts`         |
+| RFC 7748 (X25519)                   | Section 5.2 — _Test Vectors_, Section 6.1 — _Diffie-Hellman / Curve25519_                                 | Validation using official vectors to ensure interoperability and correctness                                                | `test/x25519.test.mjs`  |
+| RFC 8032 (Ed25519)                  | Section 5.1.5 — _Key Generation_, 5.1.6 — _Sign_, 5.1.7 — _Verify_                                        | Ed25519 keygen/sign/verify semantics implemented through OpenSSL via `node:crypto`                                          | `src/ed25519.ts`        |
+| RFC 8032 (Ed25519)                  | Section 7.1 — _Test Vectors for Ed25519_                                                                  | Deterministic test vectors for public key and signature verification                                                        | `test/ed25519.test.mjs` |
+| RFC 8410 (X25519 / Ed25519 in PKIX) | Section 3 — _Algorithm identifiers_, Section 4 — _SubjectPublicKeyInfo_, Section 7 — _Private Key Format_ | DER/SPKI/PKCS#8 encoding for raw 32-byte keys using Ed25519/X25519 OIDs                                                     | `src/internal/der.ts`   |
+
+---
+
+## Indirectly referenced through RFC 8410 structures
+
+| RFC      | Section                                | Usage                                               |
+| -------- | -------------------------------------- | --------------------------------------------------- |
+| RFC 5958 | OneAsymmetricKey / PKCS#8              | Private key container structure used by PKCS#8      |
+| RFC 5280 | Section 4.1.2.7 — SubjectPublicKeyInfo | Public key SPKI structure used in DER export/import |
+
+---
+
+## Notes
+
+- This project **does not reimplement curve arithmetic in JS**.
+- All cryptographic primitives are delegated to **OpenSSL via `node:crypto`**.
+- Test suite includes **official vectors from RFC 7748 and RFC 8032**.
+- DER encoding follows **RFC 8410 + PKCS#8 + SPKI layout exactly**, ensuring interop with OpenSSL / WebCrypto / libsodium / libsignal.
 
 Run:
 
@@ -192,7 +215,7 @@ npm install
 npm run bench
 ```
 
-### Real benchmark snapshot (`npm run bench:full`) on GitHub Codespaces`
+### Real benchmark snapshot (`npm run bench:full`) on GitHub Codespaces
 
 Command:
 
@@ -245,7 +268,13 @@ MIT
 
 ## Credits
 
-- [curve25519-js](https://github.com/harveyconnor/curve25519-js)
-- TweetNaCl
-- OpenSSL
-- RFC 7748 / RFC 8032
+- [curve25519-js](https://github.com/harveyconnor/curve25519-js) (Harvey Connor, Dmitry Chestnykh)
+- [TweetNaCl.js](https://tweetnacl.js.org/)
+- Trevor Perrin, "Curve25519 signatures" concept note: <https://moderncrypto.org/mail-archive/curves/2014/000205.html>
+- [Node.js `crypto` documentation](https://nodejs.org/api/crypto.html)
+- [OpenSSL](https://www.openssl.org/)
+- [RFC 7748](https://www.rfc-editor.org/rfc/rfc7748)
+- [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032)
+- [RFC 8410](https://www.rfc-editor.org/rfc/rfc8410)
+- [RFC 5958](https://www.rfc-editor.org/rfc/rfc5958)
+- [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280)
