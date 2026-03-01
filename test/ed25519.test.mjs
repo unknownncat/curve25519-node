@@ -94,3 +94,22 @@ test("runtime validation rejects wrong input sizes", () => {
     /32 bytes/,
   );
 });
+
+test("KeyObject helpers match raw ed25519 helpers", () => {
+  const seed = asBytes32(
+    hexToBytes("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb"),
+  );
+  const msg = new TextEncoder().encode("ed25519 keyobject helpers");
+  const publicKey32 = ed25519.publicKey(seed);
+
+  const privateKey = ed25519.createPrivateKeyObject(seed);
+  const publicKey = ed25519.createPublicKeyObject(publicKey32);
+  const signature64 = ed25519.signWithPrivateKey(privateKey, msg);
+
+  assert.equal(
+    bytesToHex(ed25519.publicKeyFromPrivateKeyObject(privateKey)),
+    bytesToHex(publicKey32),
+  );
+  assert.equal(bytesToHex(signature64), bytesToHex(ed25519.sign(seed, msg)));
+  assert.equal(ed25519.verifyWithPublicKey(publicKey, msg, signature64), true);
+});

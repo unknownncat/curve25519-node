@@ -76,16 +76,28 @@ const ok = axlsign.verify(kp.public, new TextEncoder().encode("hello"), sig);
 
 ### `x25519`
 
+- `createPrivateKeyObject(secretKey32: Bytes32): KeyObject`
+- `createPublicKeyObject(publicKey32: Bytes32): KeyObject`
+- `publicKeyFromPrivateKeyObject(privateKey: KeyObject): Bytes32`
 - `publicKey(secretKey32: Bytes32): Bytes32`
+- `sharedKeyFromKeyObjects(privateKey: KeyObject, publicKey: KeyObject): Bytes32`
 - `sharedKey(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32`
+- `sharedKeyStrict(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32` (rejeita segredo all-zero)
+- `sharedKeyStrictFromKeyObjects(privateKey: KeyObject, publicKey: KeyObject): Bytes32` (rejeita segredo all-zero)
+- `isAllZero32(bytes32: Bytes32): boolean`
 - `generateKeyPair(seed32: Bytes32): { public: Bytes32; private: Bytes32 }`
 
 ### `ed25519`
 
+- `createPrivateKeyObject(secretSeed32: Bytes32): KeyObject`
+- `createPublicKeyObject(publicKey32: Bytes32): KeyObject`
+- `publicKeyFromPrivateKeyObject(privateKey: KeyObject): Bytes32`
 - `publicKey(secretSeed32: Bytes32): Bytes32`
 - `generateKeyPair(seed32: Bytes32): { public: Bytes32; private: Bytes32 }`
 - `sign(secretSeed32: Bytes32, msg: Uint8Array): Bytes64`
+- `signWithPrivateKey(privateKey: KeyObject, msg: Uint8Array): Bytes64`
 - `verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes64): boolean`
+- `verifyWithPublicKey(publicKey: KeyObject, msg: Uint8Array, signature64: Bytes64): boolean`
 - `signMessage(secretSeed32: Bytes32, msg: Uint8Array): Uint8Array` (`assinatura || mensagem`)
 - `openMessage(publicKey32: Bytes32, signedMsg: Uint8Array): Uint8Array | null`
 
@@ -102,6 +114,7 @@ const ok = axlsign.verify(kp.public, new TextEncoder().encode("hello"), sig);
 ### Aliases de compatibilidade (top-level)
 
 - `sharedKey = x25519.sharedKey`
+- `sharedKeyStrict = x25519.sharedKeyStrict`
 - `generateKeyPair = x25519.generateKeyPair`
 - `sign`, `verify`, `signMessage`, `openMessage` (semântica Ed25519)
 - `generateKeyPairX25519`, `generateKeyPairEd25519`
@@ -127,10 +140,12 @@ Este pacote suporta dois modos:
 Importante:
 
 - Chaves públicas X25519 e Ed25519 são diferentes.
+- Para fluxos de protocolo mais rígidos (estilo Signal), prefira `sharedKeyStrict` para rejeitar segredo compartilhado all-zero.
 - `node:crypto` não expõe API para converter public key X25519 ↔ Ed25519.
 - Top-level `sign`/`signMessage` e namespace `ed25519` continuam com semântica Ed25519 e rejeitam `opt_random`.
 - Para compatibilidade com `curve25519-js` (incluindo `opt_random`), use o namespace `axlsign`.
 - Assinaturas Ed25519 continuam determinísticas (comportamento padrão do OpenSSL).
+- O módulo WASM de `axlsign` é carregado sob demanda na primeira chamada (importar apenas `x25519`/`ed25519` não inicializa o WASM).
 
 ---
 
@@ -210,7 +225,7 @@ Notas de implementação:
 
 - Evita cópias desnecessárias de bytes nos caminhos críticos.
 - `signMessage` monta `assinatura || mensagem` com um único `Uint8Array` prealocado.
-- Para throughput máximo em loops longos, cache de `KeyObject` no nível da aplicação reduz overhead de parse ASN.1.
+- Para throughput máximo em loops longos, use os helpers de `KeyObject` (`create*KeyObject`, `*FromKeyObjects`) para reduzir overhead de parse ASN.1.
 
 ---
 

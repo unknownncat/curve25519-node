@@ -1,3 +1,5 @@
+import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
 import {
   asBytes32,
   asBytes64,
@@ -6,7 +8,43 @@ import {
   assertUint8Array,
 } from "./internal/assert.js";
 import type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
-import * as wasmAxl from "./internal/axlsign-wasm/axlsign_wasm.js";
+import type * as WasmAxlModule from "./internal/axlsign-wasm/axlsign_wasm.js";
+
+const SELF_PACKAGE_NAME = "@unknownncat/curve25519-node";
+
+const requireBase =
+  typeof __filename === "string"
+    ? __filename
+    : typeof process.argv[1] === "string"
+      ? process.argv[1]
+      : join(process.cwd(), "index.js");
+
+const nodeRequire = createRequire(requireBase);
+
+let wasmModulePath: string | undefined;
+
+let wasmAxl: typeof WasmAxlModule | undefined;
+
+function getWasmAxl(): typeof WasmAxlModule {
+  if (wasmAxl !== undefined) {
+    return wasmAxl;
+  }
+
+  if (wasmModulePath === undefined) {
+    const packageJsonPath = nodeRequire.resolve(`${SELF_PACKAGE_NAME}/package.json`);
+    wasmModulePath = join(
+      dirname(packageJsonPath),
+      "dist",
+      "internal",
+      "axlsign-wasm",
+      "axlsign_wasm.js",
+    );
+  }
+
+  // Lazy-load WASM bindings to keep modern-only imports lightweight.
+  wasmAxl = nodeRequire(wasmModulePath) as typeof WasmAxlModule;
+  return wasmAxl;
+}
 
 function clampScalar(seed32: Bytes32): Bytes32 {
   const out = new Uint8Array(32);
@@ -27,7 +65,7 @@ function assertOptionalRandom64(value: Uint8Array | undefined, fnName: string): 
  */
 export function publicKey(secretKey32: Bytes32): Bytes32 {
   assertBytes32(secretKey32, "secretKey32");
-  const out = wasmAxl.axlsignPublicKey(secretKey32);
+  const out = getWasmAxl().axlsignPublicKey(secretKey32);
   return asBytes32(out, "axlsign public key");
 }
 
@@ -37,7 +75,7 @@ export function publicKey(secretKey32: Bytes32): Bytes32 {
 export function sharedKey(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32 {
   assertBytes32(secretKey32, "secretKey32");
   assertBytes32(publicKey32, "publicKey32");
-  const out = wasmAxl.axlsignSharedKey(secretKey32, publicKey32);
+  const out = getWasmAxl().axlsignSharedKey(secretKey32, publicKey32);
   return asBytes32(out, "axlsign shared key");
 }
 
@@ -65,8 +103,8 @@ export function sign(secretKey32: Bytes32, msg: Uint8Array, opt_random?: Uint8Ar
 
   const signature =
     opt_random === undefined
-      ? wasmAxl.axlsignSign(secretKey32, msg)
-      : wasmAxl.axlsignSignRnd(secretKey32, msg, opt_random);
+      ? getWasmAxl().axlsignSign(secretKey32, msg)
+      : getWasmAxl().axlsignSignRnd(secretKey32, msg, opt_random);
   return asBytes64(signature, "axlsign signature");
 }
 
@@ -77,7 +115,7 @@ export function verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes
   assertBytes32(publicKey32, "publicKey32");
   assertUint8Array(msg, "msg");
   assertBytes64(signature64, "signature64");
-  return wasmAxl.axlsignVerify(publicKey32, msg, signature64);
+  return getWasmAxl().axlsignVerify(publicKey32, msg, signature64);
 }
 
 /**

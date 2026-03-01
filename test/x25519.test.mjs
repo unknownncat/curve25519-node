@@ -71,3 +71,51 @@ test("runtime validation rejects invalid key sizes", () => {
     /32 bytes/,
   );
 });
+
+test("sharedKeyStrict returns same output as sharedKey for valid peers", () => {
+  const alicePrivate = asBytes32(
+    hexToBytes("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a"),
+  );
+  const bobPublic = asBytes32(
+    hexToBytes("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f"),
+  );
+
+  assert.equal(
+    bytesToHex(x25519.sharedKeyStrict(alicePrivate, bobPublic)),
+    bytesToHex(x25519.sharedKey(alicePrivate, bobPublic)),
+  );
+});
+
+test("KeyObject helpers match raw x25519 helpers", () => {
+  const alicePrivate = asBytes32(
+    hexToBytes("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a"),
+  );
+  const bobPrivate = asBytes32(
+    hexToBytes("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"),
+  );
+  const bobPublic = x25519.publicKey(bobPrivate);
+
+  const alicePrivateObj = x25519.createPrivateKeyObject(alicePrivate);
+  const bobPublicObj = x25519.createPublicKeyObject(bobPublic);
+
+  assert.equal(
+    bytesToHex(x25519.publicKeyFromPrivateKeyObject(alicePrivateObj)),
+    bytesToHex(x25519.publicKey(alicePrivate)),
+  );
+  assert.equal(
+    bytesToHex(x25519.sharedKeyFromKeyObjects(alicePrivateObj, bobPublicObj)),
+    bytesToHex(x25519.sharedKey(alicePrivate, bobPublic)),
+  );
+  assert.equal(
+    bytesToHex(x25519.sharedKeyStrictFromKeyObjects(alicePrivateObj, bobPublicObj)),
+    bytesToHex(x25519.sharedKeyStrict(alicePrivate, bobPublic)),
+  );
+});
+
+test("isAllZero32 detects zero and non-zero values", () => {
+  const zero = asBytes32(new Uint8Array(32));
+  const nonZero = asBytes32(hexToBytes("01" + "00".repeat(31)));
+
+  assert.equal(x25519.isAllZero32(zero), true);
+  assert.equal(x25519.isAllZero32(nonZero), false);
+});

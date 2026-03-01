@@ -11,8 +11,15 @@ export type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
  * Standard X25519 namespace.
  */
 export const x25519 = {
+  createPrivateKeyObject: x25519Api.createPrivateKeyObject,
+  createPublicKeyObject: x25519Api.createPublicKeyObject,
+  publicKeyFromPrivateKeyObject: x25519Api.publicKeyFromPrivateKeyObject,
   publicKey: x25519Api.publicKey,
   sharedKey: x25519Api.sharedKey,
+  sharedKeyFromKeyObjects: x25519Api.sharedKeyFromKeyObjects,
+  sharedKeyStrict: x25519Api.sharedKeyStrict,
+  sharedKeyStrictFromKeyObjects: x25519Api.sharedKeyStrictFromKeyObjects,
+  isAllZero32: x25519Api.isAllZero32,
   generateKeyPair: x25519Api.generateKeyPair,
 } as const;
 
@@ -20,10 +27,15 @@ export const x25519 = {
  * Standard Ed25519 namespace.
  */
 export const ed25519 = {
+  createPrivateKeyObject: ed25519Api.createPrivateKeyObject,
+  createPublicKeyObject: ed25519Api.createPublicKeyObject,
+  publicKeyFromPrivateKeyObject: ed25519Api.publicKeyFromPrivateKeyObject,
   publicKey: ed25519Api.publicKey,
   generateKeyPair: ed25519Api.generateKeyPair,
   sign: ed25519Api.sign,
+  signWithPrivateKey: ed25519Api.signWithPrivateKey,
   verify: ed25519Api.verify,
+  verifyWithPublicKey: ed25519Api.verifyWithPublicKey,
   signMessage: ed25519Api.signMessage,
   openMessage: ed25519Api.openMessage,
 } as const;
@@ -45,6 +57,11 @@ export const axlsign = {
  * Top-level compatibility alias for X25519 shared secret.
  */
 export const sharedKey = x25519.sharedKey;
+
+/**
+ * Top-level strict X25519 shared secret helper that rejects all-zero results.
+ */
+export const sharedKeyStrict = x25519.sharedKeyStrict;
 
 /**
  * Top-level compatibility alias for X25519 deterministic key generation.
@@ -100,6 +117,7 @@ const api = {
   ed25519,
   axlsign,
   sharedKey,
+  sharedKeyStrict,
   generateKeyPair,
   generateKeyPairX25519,
   generateKeyPairEd25519,
