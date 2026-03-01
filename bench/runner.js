@@ -302,6 +302,8 @@ function buildContext(config) {
   const modernXKeyPairs = seeds32.map((seed) => x25519.generateKeyPair(seed));
   const legacyXKeyPairs = pool.seeds.map((seed) => legacyCurve.generateKeyPair(seed));
   const modernEdKeyPairs = seeds32.map((seed) => ed25519.generateKeyPair(seed));
+  const modernAxlKeyPairs = seeds32.map((seed) => axlsign.generateKeyPair(seed));
+  const legacyAxlKeyPairs = legacyXKeyPairs;
 
   const modernSharedVectors = modernXKeyPairs.map((kp, i) => ({
     index: i,
@@ -316,6 +318,18 @@ function buildContext(config) {
 
   const sharedExpected = modernSharedVectors.map((v) => x25519.sharedKey(v.secret, v.public));
 
+  const modernAxlSharedVectors = modernAxlKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    public: modernAxlKeyPairs[(i + 1) % vectorCount].public,
+  }));
+  const legacyAxlSharedVectors = legacyAxlKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    public: legacyAxlKeyPairs[(i + 1) % vectorCount].public,
+  }));
+  const axlSharedExpected = modernAxlSharedVectors.map((v) => axlsign.sharedKey(v.secret, v.public));
+
   const modernSign32Vectors = seeds32.map((seed, i) => ({
     index: i,
     seed,
@@ -327,6 +341,21 @@ function buildContext(config) {
     secret: kp.private,
     msg: pool.msg32[i],
     public: kp.public,
+  }));
+
+  const modernAxlSign32Vectors = modernAxlKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg32[i],
+    public: kp.public,
+    rnd: pool.rnd64[i],
+  }));
+  const legacyAxlSign32Vectors = legacyAxlKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg32[i],
+    public: kp.public,
+    rnd: pool.rnd64[i],
   }));
 
   const modernSign1024Vectors = seeds32.map((seed, i) => ({
@@ -342,6 +371,21 @@ function buildContext(config) {
     public: kp.public,
   }));
 
+  const modernAxlSign1024Vectors = modernAxlKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg1024[i],
+    public: kp.public,
+    rnd: pool.rnd64[i],
+  }));
+  const legacyAxlSign1024Vectors = legacyAxlKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg1024[i],
+    public: kp.public,
+    rnd: pool.rnd64[i],
+  }));
+
   const modernVerify32Vectors = modernSign32Vectors.map((v) => ({
     ...v,
     signature: ed25519.sign(v.seed, v.msg),
@@ -350,12 +394,30 @@ function buildContext(config) {
     ...v,
     signature: legacyCurve.sign(v.secret, v.msg),
   }));
+  const modernAxlVerify32Vectors = modernAxlSign32Vectors.map((v) => ({
+    ...v,
+    signature: axlsign.sign(v.secret, v.msg),
+    signatureRnd: axlsign.sign(v.secret, v.msg, v.rnd),
+  }));
+  const legacyAxlVerify32Vectors = legacyAxlSign32Vectors.map((v) => ({
+    ...v,
+    signature: legacyCurve.sign(v.secret, v.msg),
+    signatureRnd: legacyCurve.sign(v.secret, v.msg, v.rnd),
+  }));
 
   const modernVerify1024Vectors = modernSign1024Vectors.map((v) => ({
     ...v,
     signature: ed25519.sign(v.seed, v.msg),
   }));
   const legacyVerify1024Vectors = legacySign1024Vectors.map((v) => ({
+    ...v,
+    signature: legacyCurve.sign(v.secret, v.msg),
+  }));
+  const modernAxlVerify1024Vectors = modernAxlSign1024Vectors.map((v) => ({
+    ...v,
+    signature: axlsign.sign(v.secret, v.msg),
+  }));
+  const legacyAxlVerify1024Vectors = legacyAxlSign1024Vectors.map((v) => ({
     ...v,
     signature: legacyCurve.sign(v.secret, v.msg),
   }));
@@ -372,6 +434,20 @@ function buildContext(config) {
     msg: pool.msg256[i],
     public: kp.public,
   }));
+  const modernAxlSignMessageVectors = modernAxlKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg256[i],
+    public: kp.public,
+    rnd: pool.rnd64[i],
+  }));
+  const legacyAxlSignMessageVectors = legacyAxlKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    msg: pool.msg256[i],
+    public: kp.public,
+    rnd: pool.rnd64[i],
+  }));
 
   const modernOpenMessageVectors = modernSignMessageVectors.map((v) => ({
     ...v,
@@ -380,6 +456,16 @@ function buildContext(config) {
   const legacyOpenMessageVectors = legacySignMessageVectors.map((v) => ({
     ...v,
     signed: legacyCurve.signMessage(v.secret, v.msg),
+  }));
+  const modernAxlOpenMessageVectors = modernAxlSignMessageVectors.map((v) => ({
+    ...v,
+    signed: axlsign.signMessage(v.secret, v.msg),
+    signedRnd: axlsign.signMessage(v.secret, v.msg, v.rnd),
+  }));
+  const legacyAxlOpenMessageVectors = legacyAxlSignMessageVectors.map((v) => ({
+    ...v,
+    signed: legacyCurve.signMessage(v.secret, v.msg),
+    signedRnd: legacyCurve.signMessage(v.secret, v.msg, v.rnd),
   }));
 
   const cached = {
@@ -400,21 +486,38 @@ function buildContext(config) {
     modernXKeyPairs,
     legacyXKeyPairs,
     modernEdKeyPairs,
+    modernAxlKeyPairs,
+    legacyAxlKeyPairs,
     modernSharedVectors,
     legacySharedVectors,
     sharedExpected,
+    modernAxlSharedVectors,
+    legacyAxlSharedVectors,
+    axlSharedExpected,
     modernSign32Vectors,
     legacySign32Vectors,
+    modernAxlSign32Vectors,
+    legacyAxlSign32Vectors,
     modernSign1024Vectors,
     legacySign1024Vectors,
+    modernAxlSign1024Vectors,
+    legacyAxlSign1024Vectors,
     modernVerify32Vectors,
     legacyVerify32Vectors,
+    modernAxlVerify32Vectors,
+    legacyAxlVerify32Vectors,
     modernVerify1024Vectors,
     legacyVerify1024Vectors,
+    modernAxlVerify1024Vectors,
+    legacyAxlVerify1024Vectors,
     modernSignMessageVectors,
     legacySignMessageVectors,
+    modernAxlSignMessageVectors,
+    legacyAxlSignMessageVectors,
     modernOpenMessageVectors,
     legacyOpenMessageVectors,
+    modernAxlOpenMessageVectors,
+    legacyAxlOpenMessageVectors,
     cached,
   };
 }
@@ -447,6 +550,72 @@ function runPreflightValidation(context, issues, config) {
     const modernShared = x25519.sharedKey(modernX.private, context.modernXKeyPairs[peerIndex].public);
     const legacyShared = legacyCurve.sharedKey(legacyX.private, context.legacyXKeyPairs[peerIndex].public);
     assertBytesEqual(`x25519 sharedKey modern vs legacy [${i}]`, modernShared, legacyShared, issues);
+  }
+
+  for (let i = 0; i < count; i += 1) {
+    const modernAxl = context.modernAxlKeyPairs[i];
+    const legacyAxl = context.legacyAxlKeyPairs[i];
+    const peerIndex = (i + 1) % count;
+
+    assertBytesEqual(`axlsign publicKey modern vs legacy [${i}]`, modernAxl.public, legacyAxl.public, issues);
+    assertBytesEqual(`axlsign private modern vs legacy [${i}]`, modernAxl.private, legacyAxl.private, issues);
+
+    const modernPublicFromSecret = axlsign.publicKey(modernAxl.private);
+    assertBytesEqual(
+      `axlsign publicKey(secret) modern vs legacy [${i}]`,
+      modernPublicFromSecret,
+      legacyAxl.public,
+      issues
+    );
+
+    const modernShared = axlsign.sharedKey(modernAxl.private, context.modernAxlKeyPairs[peerIndex].public);
+    const legacyShared = legacyCurve.sharedKey(legacyAxl.private, context.legacyAxlKeyPairs[peerIndex].public);
+    assertBytesEqual(`axlsign sharedKey modern vs legacy [${i}]`, modernShared, legacyShared, issues);
+
+    const modernVerify32 = context.modernAxlVerify32Vectors[i];
+    const legacyVerify32 = context.legacyAxlVerify32Vectors[i];
+    const modernVerify1024 = context.modernAxlVerify1024Vectors[i];
+    const legacyVerify1024 = context.legacyAxlVerify1024Vectors[i];
+
+    assertBytesEqual(
+      `axlsign sign(msg32) modern vs legacy [${i}]`,
+      modernVerify32.signature,
+      legacyVerify32.signature,
+      issues
+    );
+    assertBytesEqual(
+      `axlsign sign(msg32,opt_random) modern vs legacy [${i}]`,
+      modernVerify32.signatureRnd,
+      legacyVerify32.signatureRnd,
+      issues
+    );
+    assertBytesEqual(
+      `axlsign sign(msg1024) modern vs legacy [${i}]`,
+      modernVerify1024.signature,
+      legacyVerify1024.signature,
+      issues
+    );
+
+    assertTrue(
+      `axlsign verify(sign(msg32)) modern [${i}]`,
+      axlsign.verify(modernVerify32.public, modernVerify32.msg, modernVerify32.signature),
+      issues
+    );
+    assertTrue(
+      `axlsign verify(sign(msg32,opt_random)) modern [${i}]`,
+      axlsign.verify(modernVerify32.public, modernVerify32.msg, modernVerify32.signatureRnd),
+      issues
+    );
+    assertTrue(
+      `axlsign verify(sign(msg32)) legacy [${i}]`,
+      legacyCurve.verify(legacyVerify32.public, legacyVerify32.msg, legacyVerify32.signature),
+      issues
+    );
+    assertTrue(
+      `axlsign verify(sign(msg32,opt_random)) legacy [${i}]`,
+      legacyCurve.verify(legacyVerify32.public, legacyVerify32.msg, legacyVerify32.signatureRnd),
+      issues
+    );
   }
 
   for (let i = 0; i < count; i += 1) {
@@ -485,6 +654,47 @@ function runPreflightValidation(context, issues, config) {
 
     const legacyOpened = legacyCurve.openMessage(legacySigned.public, copyU8(legacySigned.signed));
     assertPayloadEqual(`legacy signMessage/openMessage [${i}]`, legacyOpened, legacySigned.msg, issues);
+
+    const modernAxlSigned = context.modernAxlOpenMessageVectors[i];
+    const legacyAxlSigned = context.legacyAxlOpenMessageVectors[i];
+
+    assertBytesEqual(
+      `axlsign signMessage(msg256) modern vs legacy [${i}]`,
+      modernAxlSigned.signed,
+      legacyAxlSigned.signed,
+      issues
+    );
+    assertBytesEqual(
+      `axlsign signMessage(msg256,opt_random) modern vs legacy [${i}]`,
+      modernAxlSigned.signedRnd,
+      legacyAxlSigned.signedRnd,
+      issues
+    );
+
+    const modernAxlOpened = axlsign.openMessage(modernAxlSigned.public, modernAxlSigned.signed);
+    assertPayloadEqual(`axlsign signMessage/openMessage [${i}]`, modernAxlOpened, modernAxlSigned.msg, issues);
+
+    const modernAxlOpenedRnd = axlsign.openMessage(modernAxlSigned.public, modernAxlSigned.signedRnd);
+    assertPayloadEqual(
+      `axlsign signMessage/openMessage opt_random [${i}]`,
+      modernAxlOpenedRnd,
+      modernAxlSigned.msg,
+      issues
+    );
+
+    const legacyAxlOpened = legacyCurve.openMessage(legacyAxlSigned.public, copyU8(legacyAxlSigned.signed));
+    assertPayloadEqual(`legacy axlsign signMessage/openMessage [${i}]`, legacyAxlOpened, legacyAxlSigned.msg, issues);
+
+    const legacyAxlOpenedRnd = legacyCurve.openMessage(
+      legacyAxlSigned.public,
+      copyU8(legacyAxlSigned.signedRnd)
+    );
+    assertPayloadEqual(
+      `legacy axlsign signMessage/openMessage opt_random [${i}]`,
+      legacyAxlOpenedRnd,
+      legacyAxlSigned.msg,
+      issues
+    );
   }
 }
 
@@ -883,9 +1093,492 @@ function buildLegacyTasksForVariant(context, variant, issues) {
   };
 }
 
+function buildModernAxlTasksForVariant(context, variant, issues) {
+  const nextSeed = createCycler(context.seeds32);
+  const nextShared = createCycler(context.modernAxlSharedVectors);
+  const nextSign32 = createCycler(context.modernAxlSign32Vectors);
+  const nextSign1024 = createCycler(context.modernAxlSign1024Vectors);
+  const nextVerify32 = createCycler(context.modernAxlVerify32Vectors);
+  const nextVerify1024 = createCycler(context.modernAxlVerify1024Vectors);
+  const nextSignMessage = createCycler(context.modernAxlSignMessageVectors);
+  const nextOpenMessage = createCycler(context.modernAxlOpenMessageVectors);
+
+  return {
+    generateKeyPair: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.generateKeyPair",
+        run: () => {
+          const selected = nextSeed();
+          last = selected;
+          const seedInput = variant === "copy" ? asBytes32(copyU8(selected.value), "seed copy") : selected.value;
+          return axlsign.generateKeyPair(seedInput);
+        },
+        verify: (result) => {
+          const expected = context.modernAxlKeyPairs[last.index];
+          assertBytesEqual("modern axlsign generateKeyPair public", result.public, expected.public, issues);
+          assertBytesEqual("modern axlsign generateKeyPair private", result.private, expected.private, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sharedKey: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.sharedKey",
+        run: () => {
+          const selected = nextShared();
+          last = selected;
+          const input = selected.value;
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+          return axlsign.sharedKey(secretInput, publicInput);
+        },
+        verify: (result) => {
+          const expected = context.axlSharedExpected[last.index];
+          assertBytesEqual("modern axlsign sharedKey", result, expected, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sign32: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.sign",
+        run: () => {
+          const selected = nextSign32();
+          last = selected;
+          const input = selected.value;
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return axlsign.sign(secretInput, msgInput);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern axlsign sign(msg32) verifies",
+            axlsign.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    sign32Rnd: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.sign(opt_random)",
+        run: () => {
+          const selected = nextSign32();
+          last = selected;
+          const input = selected.value;
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          const rndInput = variant === "copy" ? asBytes64(copyU8(input.rnd), "rnd copy") : asBytes64(input.rnd, "rnd");
+          return axlsign.sign(secretInput, msgInput, rndInput);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern axlsign sign(msg32,opt_random) verifies",
+            axlsign.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    sign1024: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.sign",
+        run: () => {
+          const selected = nextSign1024();
+          last = selected;
+          const input = selected.value;
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return axlsign.sign(secretInput, msgInput);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern axlsign sign(msg1024) verifies",
+            axlsign.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    verify32: {
+      name: "modern axlsign.verify",
+      run: () => {
+        const input = nextVerify32().value;
+        const msgInput = maybeCopyU8(input.msg, variant === "copy");
+        const signatureInput = variant === "copy" ? asBytes64(copyU8(input.signature), "signature copy") : input.signature;
+        const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+        return axlsign.verify(publicInput, msgInput, signatureInput);
+      },
+      verify: (ok) => {
+        assertTrue("modern axlsign verify(msg32)", ok, issues);
+      },
+      samples: [],
+    },
+    verify32Rnd: {
+      name: "modern axlsign.verify",
+      run: () => {
+        const input = nextVerify32().value;
+        const msgInput = maybeCopyU8(input.msg, variant === "copy");
+        const signatureInput =
+          variant === "copy" ? asBytes64(copyU8(input.signatureRnd), "signature copy") : input.signatureRnd;
+        const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+        return axlsign.verify(publicInput, msgInput, signatureInput);
+      },
+      verify: (ok) => {
+        assertTrue("modern axlsign verify(msg32,opt_random)", ok, issues);
+      },
+      samples: [],
+    },
+    verify1024: {
+      name: "modern axlsign.verify",
+      run: () => {
+        const input = nextVerify1024().value;
+        const msgInput = maybeCopyU8(input.msg, variant === "copy");
+        const signatureInput = variant === "copy" ? asBytes64(copyU8(input.signature), "signature copy") : input.signature;
+        const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+        return axlsign.verify(publicInput, msgInput, signatureInput);
+      },
+      verify: (ok) => {
+        assertTrue("modern axlsign verify(msg1024)", ok, issues);
+      },
+      samples: [],
+    },
+    signMessage: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.signMessage",
+        run: () => {
+          const selected = nextSignMessage();
+          last = selected;
+          const input = selected.value;
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return axlsign.signMessage(secretInput, msgInput);
+        },
+        verify: (signed) => {
+          const input = last.value;
+          const opened = axlsign.openMessage(input.public, signed);
+          assertPayloadEqual("modern axlsign signMessage/openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    signMessageRnd: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.signMessage(opt_random)",
+        run: () => {
+          const selected = nextSignMessage();
+          last = selected;
+          const input = selected.value;
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          const rndInput = variant === "copy" ? asBytes64(copyU8(input.rnd), "rnd copy") : asBytes64(input.rnd, "rnd");
+          return axlsign.signMessage(secretInput, msgInput, rndInput);
+        },
+        verify: (signed) => {
+          const input = last.value;
+          const opened = axlsign.openMessage(input.public, signed);
+          assertPayloadEqual("modern axlsign signMessage/openMessage opt_random", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    openMessage: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.openMessage",
+        run: () => {
+          const selected = nextOpenMessage();
+          last = selected;
+          const input = selected.value;
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+          const signedInput = makeSafeOpenInput(variant, input.signed, false);
+          return axlsign.openMessage(publicInput, signedInput);
+        },
+        verify: (opened) => {
+          const input = last.value;
+          assertPayloadEqual("modern axlsign openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    openMessageRnd: (() => {
+      let last = null;
+      return {
+        name: "modern axlsign.openMessage",
+        run: () => {
+          const selected = nextOpenMessage();
+          last = selected;
+          const input = selected.value;
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+          const signedInput = makeSafeOpenInput(variant, input.signedRnd, false);
+          return axlsign.openMessage(publicInput, signedInput);
+        },
+        verify: (opened) => {
+          const input = last.value;
+          assertPayloadEqual("modern axlsign openMessage opt_random", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+  };
+}
+
+function buildLegacyAxlTasksForVariant(context, variant, issues) {
+  const nextSeed = createCycler(context.pool.seeds);
+  const nextShared = createCycler(context.legacyAxlSharedVectors);
+  const nextSign32 = createCycler(context.legacyAxlSign32Vectors);
+  const nextSign1024 = createCycler(context.legacyAxlSign1024Vectors);
+  const nextVerify32 = createCycler(context.legacyAxlVerify32Vectors);
+  const nextVerify1024 = createCycler(context.legacyAxlVerify1024Vectors);
+  const nextSignMessage = createCycler(context.legacyAxlSignMessageVectors);
+  const nextOpenMessage = createCycler(context.legacyAxlOpenMessageVectors);
+
+  return {
+    generateKeyPair: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.generateKeyPair",
+        run: () => {
+          const selected = nextSeed();
+          last = selected;
+          const seedInput = maybeCopyU8(selected.value, variant === "copy");
+          return legacyCurve.generateKeyPair(seedInput);
+        },
+        verify: (result) => {
+          const expected = context.legacyAxlKeyPairs[last.index];
+          assertBytesEqual("legacy axlsign generateKeyPair public", result.public, expected.public, issues);
+          assertBytesEqual("legacy axlsign generateKeyPair private", result.private, expected.private, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sharedKey: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.sharedKey",
+        run: () => {
+          const selected = nextShared();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const publicInput = maybeCopyU8(input.public, variant === "copy");
+          return legacyCurve.sharedKey(secretInput, publicInput);
+        },
+        verify: (result) => {
+          const expected = context.axlSharedExpected[last.index];
+          assertBytesEqual("legacy axlsign sharedKey", result, expected, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sign32: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.sign",
+        run: () => {
+          const selected = nextSign32();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return legacyCurve.sign(secretInput, msgInput);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue("legacy axlsign sign(msg32) verifies", legacyCurve.verify(input.public, input.msg, signature), issues);
+        },
+        samples: [],
+      };
+    })(),
+    sign32Rnd: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.sign(opt_random)",
+        run: () => {
+          const selected = nextSign32();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          const rndInput = maybeCopyU8(input.rnd, variant === "copy");
+          return legacyCurve.sign(secretInput, msgInput, rndInput);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "legacy axlsign sign(msg32,opt_random) verifies",
+            legacyCurve.verify(input.public, input.msg, signature),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    sign1024: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.sign",
+        run: () => {
+          const selected = nextSign1024();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return legacyCurve.sign(secretInput, msgInput);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "legacy axlsign sign(msg1024) verifies",
+            legacyCurve.verify(input.public, input.msg, signature),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    verify32: {
+      name: "legacy curve.verify",
+      run: () => {
+        const input = nextVerify32().value;
+        const msgInput = maybeCopyU8(input.msg, variant === "copy");
+        const signatureInput = maybeCopyU8(input.signature, variant === "copy");
+        const publicInput = maybeCopyU8(input.public, variant === "copy");
+        return legacyCurve.verify(publicInput, msgInput, signatureInput);
+      },
+      verify: (ok) => {
+        assertTrue("legacy axlsign verify(msg32)", ok, issues);
+      },
+      samples: [],
+    },
+    verify32Rnd: {
+      name: "legacy curve.verify",
+      run: () => {
+        const input = nextVerify32().value;
+        const msgInput = maybeCopyU8(input.msg, variant === "copy");
+        const signatureInput = maybeCopyU8(input.signatureRnd, variant === "copy");
+        const publicInput = maybeCopyU8(input.public, variant === "copy");
+        return legacyCurve.verify(publicInput, msgInput, signatureInput);
+      },
+      verify: (ok) => {
+        assertTrue("legacy axlsign verify(msg32,opt_random)", ok, issues);
+      },
+      samples: [],
+    },
+    verify1024: {
+      name: "legacy curve.verify",
+      run: () => {
+        const input = nextVerify1024().value;
+        const msgInput = maybeCopyU8(input.msg, variant === "copy");
+        const signatureInput = maybeCopyU8(input.signature, variant === "copy");
+        const publicInput = maybeCopyU8(input.public, variant === "copy");
+        return legacyCurve.verify(publicInput, msgInput, signatureInput);
+      },
+      verify: (ok) => {
+        assertTrue("legacy axlsign verify(msg1024)", ok, issues);
+      },
+      samples: [],
+    },
+    signMessage: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.signMessage",
+        run: () => {
+          const selected = nextSignMessage();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          return legacyCurve.signMessage(secretInput, msgInput);
+        },
+        verify: (signed) => {
+          const input = last.value;
+          const opened = legacyCurve.openMessage(input.public, copyU8(signed));
+          assertPayloadEqual("legacy axlsign signMessage/openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    signMessageRnd: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.signMessage(opt_random)",
+        run: () => {
+          const selected = nextSignMessage();
+          last = selected;
+          const input = selected.value;
+          const secretInput = maybeCopyU8(input.secret, variant === "copy");
+          const msgInput = maybeCopyU8(input.msg, variant === "copy");
+          const rndInput = maybeCopyU8(input.rnd, variant === "copy");
+          return legacyCurve.signMessage(secretInput, msgInput, rndInput);
+        },
+        verify: (signed) => {
+          const input = last.value;
+          const opened = legacyCurve.openMessage(input.public, copyU8(signed));
+          assertPayloadEqual("legacy axlsign signMessage/openMessage opt_random", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    openMessage: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.openMessage",
+        run: () => {
+          const selected = nextOpenMessage();
+          last = selected;
+          const input = selected.value;
+          const publicInput = maybeCopyU8(input.public, variant === "copy");
+          const signedInput = copyU8(input.signed);
+          return legacyCurve.openMessage(publicInput, signedInput);
+        },
+        verify: (opened) => {
+          const input = last.value;
+          assertPayloadEqual("legacy axlsign openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    openMessageRnd: (() => {
+      let last = null;
+      return {
+        name: "legacy curve.openMessage",
+        run: () => {
+          const selected = nextOpenMessage();
+          last = selected;
+          const input = selected.value;
+          const publicInput = maybeCopyU8(input.public, variant === "copy");
+          const signedInput = copyU8(input.signedRnd);
+          return legacyCurve.openMessage(publicInput, signedInput);
+        },
+        verify: (opened) => {
+          const input = last.value;
+          assertPayloadEqual("legacy axlsign openMessage opt_random", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+  };
+}
+
 function buildPairDescriptors(context, variant, issues, config) {
   const modern = buildModernTasksForVariant(context, variant, issues, config);
   const legacy = buildLegacyTasksForVariant(context, variant, issues);
+  const modernAxl = buildModernAxlTasksForVariant(context, variant, issues);
+  const legacyAxl = buildLegacyAxlTasksForVariant(context, variant, issues);
 
   return [
     {
@@ -897,6 +1590,66 @@ function buildPairDescriptors(context, variant, issues, config) {
       id: `x25519.sharedKey.${variant}`,
       label: `[${variant}] X25519 sharedKey(sk, pk)`,
       tasks: [modern.sharedKey, legacy.sharedKey],
+    },
+    {
+      id: `axlsign.generateKeyPair.${variant}`,
+      label: `[${variant}] axlsign generateKeyPair(seed32)`,
+      tasks: [modernAxl.generateKeyPair, legacyAxl.generateKeyPair],
+    },
+    {
+      id: `axlsign.sharedKey.${variant}`,
+      label: `[${variant}] axlsign sharedKey(sk, pk)`,
+      tasks: [modernAxl.sharedKey, legacyAxl.sharedKey],
+    },
+    {
+      id: `axlsign.sign.32.${variant}`,
+      label: `[${variant}] axlsign sign(msg32) [equivalent schemes]`,
+      tasks: [modernAxl.sign32, legacyAxl.sign32],
+    },
+    {
+      id: `axlsign.sign.32.rnd.${variant}`,
+      label: `[${variant}] axlsign sign(msg32,opt_random) [equivalent schemes]`,
+      tasks: [modernAxl.sign32Rnd, legacyAxl.sign32Rnd],
+    },
+    {
+      id: `axlsign.sign.1024.${variant}`,
+      label: `[${variant}] axlsign sign(msg1024) [equivalent schemes]`,
+      tasks: [modernAxl.sign1024, legacyAxl.sign1024],
+    },
+    {
+      id: `axlsign.verify.32.${variant}`,
+      label: `[${variant}] axlsign verify(msg32) [equivalent schemes]`,
+      tasks: [modernAxl.verify32, legacyAxl.verify32],
+    },
+    {
+      id: `axlsign.verify.32.rnd.${variant}`,
+      label: `[${variant}] axlsign verify(msg32,opt_random) [equivalent schemes]`,
+      tasks: [modernAxl.verify32Rnd, legacyAxl.verify32Rnd],
+    },
+    {
+      id: `axlsign.verify.1024.${variant}`,
+      label: `[${variant}] axlsign verify(msg1024) [equivalent schemes]`,
+      tasks: [modernAxl.verify1024, legacyAxl.verify1024],
+    },
+    {
+      id: `axlsign.signMessage.256.${variant}`,
+      label: `[${variant}] axlsign signMessage(msg256) [equivalent schemes]`,
+      tasks: [modernAxl.signMessage, legacyAxl.signMessage],
+    },
+    {
+      id: `axlsign.signMessage.256.rnd.${variant}`,
+      label: `[${variant}] axlsign signMessage(msg256,opt_random) [equivalent schemes]`,
+      tasks: [modernAxl.signMessageRnd, legacyAxl.signMessageRnd],
+    },
+    {
+      id: `axlsign.openMessage.256.${variant}`,
+      label: `[${variant}] axlsign openMessage(msg256) [equivalent schemes]`,
+      tasks: [modernAxl.openMessage, legacyAxl.openMessage],
+    },
+    {
+      id: `axlsign.openMessage.256.rnd.${variant}`,
+      label: `[${variant}] axlsign openMessage(msg256,opt_random) [equivalent schemes]`,
+      tasks: [modernAxl.openMessageRnd, legacyAxl.openMessageRnd],
     },
     {
       id: `sign.32.${variant}`,

@@ -1,5 +1,8 @@
 /wasm/axlsign/target
+/wasm/**/target/
 /wasm/axlsign/Cargo.lock
+/bench/node_modules/
+/bench/results/
 
 # Logs
 logs
