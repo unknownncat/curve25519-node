@@ -30,7 +30,7 @@ npm run typecheck
 npm test
 ```
 
-Validação completa (mesmo padrão do CI):
+Validação completa local:
 
 ```bash
 npm run ci
