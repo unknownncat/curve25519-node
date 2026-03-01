@@ -314,20 +314,28 @@ Environment:
 - Logical cores: `4`
 - Vectors: `64`
 
-### Table 1 - Modern API (`x25519` + `ed25519`)
+### Table 1 - Modern API (native + WASM)
 
 `sign`/`verify` rows below compare API throughput, not cryptographic equivalence (Ed25519 vs legacy axlsign).
 
-| Operation                      | Modern raw | Legacy raw (`curve25519-js`) | Raw speedup | Modern cached | Legacy cached (`curve25519-js`) | Cached speedup |
-| ------------------------------ | ---------: | ---------------------------: | ----------: | ------------: | ------------------------------: | -------------: |
-| `x25519.generateKeyPair`       |     14,378 |                        1,591 |       9.04x |        41,120 |                           1,478 |         27.83x |
-| `x25519.sharedKey`             |      9,970 |                        1,591 |       6.27x |        23,995 |                           1,554 |         15.44x |
-| `ed25519.sign (msg32)`         |     11,273 |                          143 |      78.95x |        23,696 |                             133 |        178.10x |
-| `ed25519.sign (msg1024)`       |     10,800 |                          138 |      78.07x |        22,502 |                             147 |        152.92x |
-| `ed25519.verify (msg32)`       |      7,280 |                          136 |      53.36x |         8,271 |                             155 |         53.37x |
-| `ed25519.verify (msg1024)`     |      7,160 |                          132 |      54.33x |         8,159 |                             154 |         52.90x |
-| `ed25519.signMessage (msg256)` |     10,624 |                          131 |      81.09x |        23,304 |                             148 |        156.97x |
-| `ed25519.openMessage (msg256)` |      6,574 |                          124 |      52.93x |         8,129 |                             154 |         52.64x |
+| Operation                           | Modern raw | Legacy raw (`curve25519-js`) | Raw speedup | Modern cached | Legacy cached (`curve25519-js`) | Cached speedup |
+| ----------------------------------- | ---------: | ---------------------------: | ----------: | ------------: | ------------------------------: | -------------: |
+| `x25519.generateKeyPair`            |     14,082 |                        1,579 |       8.92x |        49,035 |                           1,576 |         31.12x |
+| `x25519.sharedKey`                  |     10,134 |                        1,568 |       6.46x |        25,423 |                           1,578 |         16.11x |
+| `wasm.x25519.generateKeyPair`       |      8,415 |                        1,571 |       5.36x |         8,385 |                           1,574 |          5.33x |
+| `wasm.x25519.sharedKey`             |      8,333 |                        1,577 |       5.28x |         8,350 |                           1,583 |          5.28x |
+| `ed25519.sign (msg32)`              |     11,273 |                          142 |      79.56x |        23,886 |                             137 |        174.75x |
+| `wasm.ed25519.sign (msg32)`         |      3,945 |                          142 |      27.80x |         3,956 |                             140 |         28.27x |
+| `ed25519.sign (msg1024)`            |     10,759 |                          136 |      79.31x |        22,335 |                             138 |        162.38x |
+| `wasm.ed25519.sign (msg1024)`       |      3,872 |                          137 |      28.27x |         3,873 |                             137 |         28.37x |
+| `ed25519.verify (msg32)`            |      7,333 |                          142 |      51.65x |         8,186 |                             141 |         58.01x |
+| `wasm.ed25519.verify (msg32)`       |      7,747 |                          141 |      54.84x |         7,629 |                             143 |         53.26x |
+| `ed25519.verify (msg1024)`          |      7,241 |                          134 |      54.20x |         8,081 |                             136 |         59.35x |
+| `wasm.ed25519.verify (msg1024)`     |      7,505 |                          135 |      55.76x |         7,480 |                             134 |         55.66x |
+| `ed25519.signMessage (msg256)`      |     10,859 |                          140 |      77.67x |        23,607 |                             132 |        178.57x |
+| `wasm.ed25519.signMessage (msg256)` |      3,888 |                          139 |      27.99x |         3,867 |                             137 |         28.23x |
+| `ed25519.openMessage (msg256)`      |      7,113 |                          145 |      49.03x |         8,012 |                             141 |         56.96x |
+| `wasm.ed25519.openMessage (msg256)` |      7,428 |                          137 |      54.26x |         7,476 |                             137 |         54.74x |
 
 ### Table 2 - `axlsign` compatibility mode (equivalent to `curve25519-js`)
 
@@ -335,18 +343,18 @@ This table compares the same cryptographic scheme (equivalence + throughput).
 
 | Operation                                 | Modern raw | Legacy raw (`curve25519-js`) | Raw speedup | Modern cached | Legacy cached (`curve25519-js`) | Cached speedup |
 | ----------------------------------------- | ---------: | ---------------------------: | ----------: | ------------: | ------------------------------: | -------------: |
-| `axlsign.generateKeyPair`                 |      8,429 |                        1,583 |       5.33x |         8,384 |                           1,585 |          5.29x |
-| `axlsign.sharedKey`                       |      8,452 |                        1,583 |       5.34x |         8,396 |                           1,570 |          5.35x |
-| `axlsign.sign (msg32)`                    |      3,973 |                          144 |      27.61x |         3,952 |                             140 |         28.28x |
-| `axlsign.sign (msg32,opt_random)`         |      3,969 |                          147 |      27.03x |         3,984 |                             139 |         28.58x |
-| `axlsign.sign (msg1024)`                  |      3,881 |                          143 |      27.16x |         3,864 |                             139 |         27.72x |
-| `axlsign.verify (msg32)`                  |      6,527 |                          146 |      44.70x |         6,534 |                             143 |         45.72x |
-| `axlsign.verify (msg32,opt_random)`       |      6,506 |                          144 |      45.07x |         6,469 |                             141 |         45.80x |
-| `axlsign.verify (msg1024)`                |      6,361 |                          141 |      45.03x |         6,337 |                             135 |         46.92x |
-| `axlsign.signMessage (msg256)`            |      3,902 |                          140 |      27.79x |         3,935 |                             141 |         27.98x |
-| `axlsign.signMessage (msg256,opt_random)` |      3,885 |                          142 |      27.40x |         3,864 |                             145 |         26.60x |
-| `axlsign.openMessage (msg256)`            |      6,441 |                          138 |      46.57x |         6,300 |                             131 |         47.93x |
-| `axlsign.openMessage (msg256,opt_random)` |      6,362 |                          141 |      45.24x |         6,285 |                             130 |         48.22x |
+| `axlsign.generateKeyPair`                 |      8,382 |                        1,571 |       5.34x |         8,357 |                           1,579 |          5.29x |
+| `axlsign.sharedKey`                       |      8,361 |                        1,583 |       5.28x |         8,422 |                           1,564 |          5.39x |
+| `axlsign.sign (msg32)`                    |      4,010 |                          140 |      28.59x |         3,970 |                             141 |         28.10x |
+| `axlsign.sign (msg32,opt_random)`         |      4,000 |                          142 |      28.07x |         3,965 |                             136 |         29.08x |
+| `axlsign.sign (msg1024)`                  |      3,883 |                          138 |      28.17x |         3,878 |                             138 |         28.03x |
+| `axlsign.verify (msg32)`                  |      6,604 |                          144 |      45.83x |         6,585 |                             143 |         46.17x |
+| `axlsign.verify (msg32,opt_random)`       |      6,531 |                          143 |      45.69x |         6,527 |                             142 |         46.08x |
+| `axlsign.verify (msg1024)`                |      6,428 |                          138 |      46.47x |         6,377 |                             136 |         46.82x |
+| `axlsign.signMessage (msg256)`            |      3,913 |                          140 |      27.85x |         3,935 |                             136 |         28.92x |
+| `axlsign.signMessage (msg256,opt_random)` |      3,941 |                          139 |      28.39x |         3,878 |                             139 |         27.93x |
+| `axlsign.openMessage (msg256)`            |      6,440 |                          138 |      46.78x |         6,407 |                             136 |         47.18x |
+| `axlsign.openMessage (msg256,opt_random)` |      6,513 |                          134 |      48.53x |         6,431 |                             133 |         48.19x |
 
 Notes:
 
