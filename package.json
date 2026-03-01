@@ -1,7 +1,7 @@
 {
   "name": "@unknownncat/curve25519-node",
   "version": "1.0.1",
-  "description": "Modern zero-dependency X25519 + Ed25519 for Node.js using OpenSSL via node:crypto",
+  "description": "Zero-dependency Curve25519 toolkit for Node.js: native X25519/Ed25519 (node:crypto/OpenSSL) + legacy axlsign compatibility via Rust/WASM",
   "keywords": [
     "curve25519",
     "x25519",
