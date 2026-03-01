@@ -5,6 +5,7 @@
 Zero-runtime-dependency implementation of:
 
 - X25519 + Ed25519 (modern mode via OpenSSL in `node:crypto`)
+- X25519 + Ed25519 (optional modern mode via WASM)
 - legacy axlsign (optional WASM mode, compatible with `curve25519-js`)
 
 [![npm](https://img.shields.io/npm/v/@unknownncat/curve25519-node)](https://www.npmjs.com/package/@unknownncat/curve25519-node)
@@ -70,6 +71,20 @@ const sig = axlsign.sign(kp.private, new TextEncoder().encode("hello"), new Uint
 const ok = axlsign.verify(kp.public, new TextEncoder().encode("hello"), sig);
 ```
 
+Modern WASM mode (`wasm`):
+
+```ts
+import { asBytes32, wasm } from "@unknownncat/curve25519-node";
+
+const seed = asBytes32(new Uint8Array(32));
+const kp = wasm.x25519.generateKeyPair(seed);
+const shared = wasm.x25519.sharedKey(kp.private, kp.public);
+
+const msg = new TextEncoder().encode("hello");
+const sig = wasm.ed25519.sign(seed, msg);
+const ok = wasm.ed25519.verify(wasm.ed25519.publicKey(seed), msg, sig);
+```
+
 ---
 
 ## API
@@ -111,6 +126,35 @@ const ok = axlsign.verify(kp.public, new TextEncoder().encode("hello"), sig);
 - `signMessage(secretKey32: Bytes32, msg: Uint8Array, opt_random?: Bytes64): Uint8Array`
 - `openMessage(publicKey32: Bytes32, signedMsg: Uint8Array): Uint8Array | null`
 
+### `wasm` (optional modern mode via WASM)
+
+`wasm.x25519`:
+
+- `createPrivateKeyObject(secretKey32: Bytes32): WasmX25519PrivateKeyObject`
+- `createPublicKeyObject(publicKey32: Bytes32): WasmX25519PublicKeyObject`
+- `publicKeyFromPrivateKeyObject(privateKey: WasmX25519PrivateKeyObject): Bytes32`
+- `publicKey(secretKey32: Bytes32): Bytes32`
+- `sharedKeyFromKeyObjects(privateKey: WasmX25519PrivateKeyObject, publicKey: WasmX25519PublicKeyObject): Bytes32`
+- `sharedKey(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32`
+- `sharedKeyStrict(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32`
+- `sharedKeyStrictFromKeyObjects(privateKey: WasmX25519PrivateKeyObject, publicKey: WasmX25519PublicKeyObject): Bytes32`
+- `isAllZero32(bytes32: Bytes32): boolean`
+- `generateKeyPair(seed32: Bytes32): { public: Bytes32; private: Bytes32 }`
+
+`wasm.ed25519`:
+
+- `createPrivateKeyObject(secretSeed32: Bytes32): WasmEd25519PrivateKeyObject`
+- `createPublicKeyObject(publicKey32: Bytes32): WasmEd25519PublicKeyObject`
+- `publicKeyFromPrivateKeyObject(privateKey: WasmEd25519PrivateKeyObject): Bytes32`
+- `publicKey(secretSeed32: Bytes32): Bytes32`
+- `generateKeyPair(seed32: Bytes32): { public: Bytes32; private: Bytes32 }`
+- `sign(secretSeed32: Bytes32, msg: Uint8Array): Bytes64`
+- `signWithPrivateKey(privateKey: WasmEd25519PrivateKeyObject, msg: Uint8Array): Bytes64`
+- `verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes64): boolean`
+- `verifyWithPublicKey(publicKey: WasmEd25519PublicKeyObject, msg: Uint8Array, signature64: Bytes64): boolean`
+- `signMessage(secretSeed32: Bytes32, msg: Uint8Array): Uint8Array`
+- `openMessage(publicKey32: Bytes32, signedMsg: Uint8Array): Uint8Array | null`
+
 ### Top-level compatibility aliases
 
 - `sharedKey = x25519.sharedKey`
@@ -123,19 +167,22 @@ const ok = axlsign.verify(kp.public, new TextEncoder().encode("hello"), sig);
 
 ## Compatibility Notes
 
-This package provides two modes:
+This package provides three modes:
 
-- **modern (recommended):** `x25519` + `ed25519` via `node:crypto`
+- **modern native (recommended):** `x25519` + `ed25519` via `node:crypto`
+- **modern WASM (optional):** `wasm` namespace (`wasm.x25519` + `wasm.ed25519`)
 - **legacy:** `axlsign` via WASM for `curve25519-js` compatibility
 
-| Feature                      | `curve25519-js` | `curve25519-node`                           |
-| ---------------------------- | --------------- | ------------------------------------------- |
-| Signature scheme (modern)    | axlsign         | Ed25519 (standard)                          |
-| Signature scheme (legacy)    | axlsign         | axlsign (namespace `axlsign`)               |
-| Key agreement                | X25519          | X25519                                      |
-| Same key for signing + ECDH  | yes             | only in `axlsign` namespace                 |
-| `opt_random` in signing APIs | yes             | yes in `axlsign`, no in top-level/`ed25519` |
-| OpenSSL backend              | no              | yes                                         |
+| Feature                          | `curve25519-js` | `curve25519-node`                           |
+| -------------------------------- | --------------- | ------------------------------------------- |
+| Signature scheme (modern)        | axlsign         | Ed25519 (standard)                          |
+| Alternative modern scheme        | no              | Ed25519 via WASM (`wasm.ed25519`)           |
+| Signature scheme (legacy)        | axlsign         | axlsign (namespace `axlsign`)               |
+| Key agreement                    | X25519          | X25519                                      |
+| Alternative modern key agreement | no              | X25519 via WASM (`wasm.x25519`)             |
+| Same key for signing + ECDH      | yes             | only in `axlsign` namespace                 |
+| `opt_random` in signing APIs     | yes             | yes in `axlsign`, no in top-level/`ed25519` |
+| OpenSSL backend                  | no              | yes                                         |
 
 Important:
 
@@ -145,7 +192,7 @@ Important:
 - Top-level `sign`/`signMessage` and `ed25519` keep Ed25519 semantics and reject `opt_random`.
 - For `curve25519-js` compatibility (including `opt_random`), use namespace `axlsign`.
 - Ed25519 signatures here are deterministic (OpenSSL default behavior).
-- The `axlsign` WASM module is lazy-loaded on first call (importing only `x25519`/`ed25519` does not initialize WASM).
+- WASM modules (`axlsign` and `wasm`) are lazy-loaded on first call (importing only `x25519`/`ed25519` does not initialize WASM).
 
 ---
 
@@ -160,7 +207,10 @@ This package targets modern Node using OpenSSL primitives:
 - smaller, explicit API surface
 - strong typing with zero runtime dependencies
 
-In addition, the WASM `axlsign` namespace enables progressive migration of legacy code without reintroducing manual curve arithmetic in JavaScript.
+In addition:
+
+- WASM `axlsign` enables progressive migration of legacy code.
+- WASM `wasm` provides a modern backend option without relying on `node:crypto` in the crypto execution path.
 
 ---
 
@@ -306,7 +356,7 @@ Notes:
 
 ---
 
-## Building `axlsign`
+## Building WASM namespaces (`axlsign` and `wasm`)
 
 In the npm package, WASM artifacts are already prebuilt under `dist/`.
 
@@ -318,8 +368,11 @@ To build from source, you need:
 Then `npm run build` runs:
 
 1. `wasm-pack build` (`wasm/axlsign`)
-2. TypeScript ESM + CJS build
-3. copy of WASM artifacts to `dist/internal/axlsign-wasm`
+2. `wasm-pack build` (`wasm/curve25519-wasm`)
+3. TypeScript ESM + CJS build
+4. copy of WASM artifacts to `dist/internal/axlsign-wasm` and `dist/internal/curve25519-wasm`
+
+Rust crates reference: [wasm/README.md](./wasm/README.md)
 
 ---
 
@@ -341,6 +394,12 @@ npm run ci
 
 MIT
 
+Additional compliance/security documents:
+
+- [NOTICE.md](./NOTICE.md) (canonical third-party notice)
+- [THIRD_PARTY_NOTICE.md](./THIRD_PARTY_NOTICE.md) and [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) (compatibility aliases)
+- [SECURITY.md](./SECURITY.md) (security policy and vulnerability reporting)
+
 ---
 
 ## Credits
@@ -350,6 +409,12 @@ MIT
 - Trevor Perrin, Curve25519 signatures idea: <https://moderncrypto.org/mail-archive/curves/2014/000205.html>
 - [Node.js `crypto` docs](https://nodejs.org/api/crypto.html)
 - [OpenSSL](https://www.openssl.org/)
+- [RustCrypto](https://github.com/RustCrypto)
+- [wasm-bindgen](https://github.com/wasm-bindgen/wasm-bindgen)
+- [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek)
+- [ed25519-dalek](https://github.com/dalek-cryptography/ed25519-dalek)
+- [x25519-dalek](https://github.com/dalek-cryptography/x25519-dalek)
+- [zeroize](https://github.com/RustCrypto/utils/tree/master/zeroize)
 - [RFC 7748](https://www.rfc-editor.org/rfc/rfc7748)
 - [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032)
 - [RFC 8410](https://www.rfc-editor.org/rfc/rfc8410)

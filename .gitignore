@@ -1,6 +1,7 @@
 /wasm/axlsign/target
 /wasm/**/target/
 /wasm/axlsign/Cargo.lock
+/wasm/curve25519-wasm/Cargo.lock
 /bench/node_modules/
 /bench/results/
 

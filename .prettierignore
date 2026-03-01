@@ -5,4 +5,5 @@ bench/node_modules/
 bench/results/
 wasm/**/target/
 src/internal/axlsign-wasm/
+src/internal/curve25519-wasm/
 package-lock.json

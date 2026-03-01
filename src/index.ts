@@ -1,5 +1,6 @@
 import { assertNoOptRandom, assertUint8Array } from "./internal/assert.js";
 import * as axlsignApi from "./axlsign.js";
+import * as wasmApi from "./wasm.js";
 import * as ed25519Api from "./ed25519.js";
 import * as x25519Api from "./x25519.js";
 import type { Bytes32, Bytes64 } from "./types.js";
@@ -51,6 +52,14 @@ export const axlsign = {
   verify: axlsignApi.verify,
   signMessage: axlsignApi.signMessage,
   openMessage: axlsignApi.openMessage,
+} as const;
+
+/**
+ * Optional modern WASM namespace with X25519 + Ed25519 parity methods.
+ */
+export const wasm = {
+  x25519: wasmApi.x25519,
+  ed25519: wasmApi.ed25519,
 } as const;
 
 /**
@@ -116,6 +125,7 @@ const api = {
   x25519,
   ed25519,
   axlsign,
+  wasm,
   sharedKey,
   sharedKeyStrict,
   generateKeyPair,

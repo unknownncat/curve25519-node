@@ -12,6 +12,7 @@ test("CJS require loads package API from dist/cjs", () => {
   assert.equal(typeof cjs.x25519, "object");
   assert.equal(typeof cjs.ed25519, "object");
   assert.equal(typeof cjs.axlsign, "object");
+  assert.equal(typeof cjs.wasm, "object");
 
   assert.equal(typeof cjs.asBytes32, "function");
   assert.equal(typeof cjs.sharedKey, "function");
@@ -19,4 +20,5 @@ test("CJS require loads package API from dist/cjs", () => {
   assert.equal(typeof cjs.sign, "function");
   assert.equal(typeof cjs.verify, "function");
   assert.equal(typeof cjs.axlsign.sign, "function");
+  assert.equal(typeof cjs.wasm.x25519.sharedKey, "function");
 });

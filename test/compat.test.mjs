@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   asBytes32,
   ed25519,
+  wasm,
   generateKeyPair,
   generateKeyPairEd25519,
   generateKeyPairX25519,
@@ -37,6 +38,8 @@ test("top-level aliases map to namespaces", () => {
   const signature = sign(seedEd, msg);
   assert.equal(verify(kpEd.public, msg, signature), true);
   assert.equal(ed25519.verify(kpEd.public, msg, signature), true);
+  assert.equal(typeof wasm.x25519.sharedKey, "function");
+  assert.equal(typeof wasm.ed25519.sign, "function");
 
   const signed = signMessage(seedEd, msg);
   assert.deepEqual(openMessage(kpEd.public, signed), msg);

@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import legacyCurve from "curve25519-js";
-import { asBytes32, asBytes64, axlsign, ed25519, x25519 } from "@unknownncat/curve25519-node";
+import { asBytes32, asBytes64, axlsign, ed25519, wasm, x25519 } from "@unknownncat/curve25519-node";
 
 import { parseArgs, modeSummary } from "./config.js";
 import { buildInputPool, copyU8, maybeCopyU8, createCycler } from "./pool.js";
@@ -302,6 +302,8 @@ function buildContext(config) {
   const modernXKeyPairs = seeds32.map((seed) => x25519.generateKeyPair(seed));
   const legacyXKeyPairs = pool.seeds.map((seed) => legacyCurve.generateKeyPair(seed));
   const modernEdKeyPairs = seeds32.map((seed) => ed25519.generateKeyPair(seed));
+  const modernWasmXKeyPairs = seeds32.map((seed) => wasm.x25519.generateKeyPair(seed));
+  const modernWasmEdKeyPairs = seeds32.map((seed) => wasm.ed25519.generateKeyPair(seed));
   const modernAxlKeyPairs = seeds32.map((seed) => axlsign.generateKeyPair(seed));
   const legacyAxlKeyPairs = legacyXKeyPairs;
 
@@ -317,6 +319,13 @@ function buildContext(config) {
   }));
 
   const sharedExpected = modernSharedVectors.map((v) => x25519.sharedKey(v.secret, v.public));
+
+  const modernWasmSharedVectors = modernWasmXKeyPairs.map((kp, i) => ({
+    index: i,
+    secret: kp.private,
+    public: modernWasmXKeyPairs[(i + 1) % vectorCount].public,
+  }));
+  const wasmSharedExpected = modernWasmSharedVectors.map((v) => wasm.x25519.sharedKey(v.secret, v.public));
 
   const modernAxlSharedVectors = modernAxlKeyPairs.map((kp, i) => ({
     index: i,
@@ -335,6 +344,12 @@ function buildContext(config) {
     seed,
     msg: pool.msg32[i],
     public: modernEdKeyPairs[i].public,
+  }));
+  const modernWasmSign32Vectors = seeds32.map((seed, i) => ({
+    index: i,
+    seed,
+    msg: pool.msg32[i],
+    public: modernWasmEdKeyPairs[i].public,
   }));
   const legacySign32Vectors = legacyXKeyPairs.map((kp, i) => ({
     index: i,
@@ -364,6 +379,12 @@ function buildContext(config) {
     msg: pool.msg1024[i],
     public: modernEdKeyPairs[i].public,
   }));
+  const modernWasmSign1024Vectors = seeds32.map((seed, i) => ({
+    index: i,
+    seed,
+    msg: pool.msg1024[i],
+    public: modernWasmEdKeyPairs[i].public,
+  }));
   const legacySign1024Vectors = legacyXKeyPairs.map((kp, i) => ({
     index: i,
     secret: kp.private,
@@ -390,6 +411,10 @@ function buildContext(config) {
     ...v,
     signature: ed25519.sign(v.seed, v.msg),
   }));
+  const modernWasmVerify32Vectors = modernWasmSign32Vectors.map((v) => ({
+    ...v,
+    signature: wasm.ed25519.sign(v.seed, v.msg),
+  }));
   const legacyVerify32Vectors = legacySign32Vectors.map((v) => ({
     ...v,
     signature: legacyCurve.sign(v.secret, v.msg),
@@ -409,6 +434,10 @@ function buildContext(config) {
     ...v,
     signature: ed25519.sign(v.seed, v.msg),
   }));
+  const modernWasmVerify1024Vectors = modernWasmSign1024Vectors.map((v) => ({
+    ...v,
+    signature: wasm.ed25519.sign(v.seed, v.msg),
+  }));
   const legacyVerify1024Vectors = legacySign1024Vectors.map((v) => ({
     ...v,
     signature: legacyCurve.sign(v.secret, v.msg),
@@ -427,6 +456,12 @@ function buildContext(config) {
     seed,
     msg: pool.msg256[i],
     public: modernEdKeyPairs[i].public,
+  }));
+  const modernWasmSignMessageVectors = seeds32.map((seed, i) => ({
+    index: i,
+    seed,
+    msg: pool.msg256[i],
+    public: modernWasmEdKeyPairs[i].public,
   }));
   const legacySignMessageVectors = legacyXKeyPairs.map((kp, i) => ({
     index: i,
@@ -453,6 +488,10 @@ function buildContext(config) {
     ...v,
     signed: ed25519.signMessage(v.seed, v.msg),
   }));
+  const modernWasmOpenMessageVectors = modernWasmSignMessageVectors.map((v) => ({
+    ...v,
+    signed: wasm.ed25519.signMessage(v.seed, v.msg),
+  }));
   const legacyOpenMessageVectors = legacySignMessageVectors.map((v) => ({
     ...v,
     signed: legacyCurve.signMessage(v.secret, v.msg),
@@ -477,6 +516,16 @@ function buildContext(config) {
       privateKeys: seeds32.map((seed) => keyFromEd25519Private(seed)),
       publicKeys: modernEdKeyPairs.map((kp) => keyFromEd25519Public(kp.public)),
     },
+    wasm: {
+      x25519: {
+        privateKeys: modernWasmXKeyPairs.map((kp) => wasm.x25519.createPrivateKeyObject(kp.private)),
+        publicKeys: modernWasmXKeyPairs.map((kp) => wasm.x25519.createPublicKeyObject(kp.public)),
+      },
+      ed25519: {
+        privateKeys: seeds32.map((seed) => wasm.ed25519.createPrivateKeyObject(seed)),
+        publicKeys: modernWasmEdKeyPairs.map((kp) => wasm.ed25519.createPublicKeyObject(kp.public)),
+      },
+    },
   };
 
   return {
@@ -486,35 +535,45 @@ function buildContext(config) {
     modernXKeyPairs,
     legacyXKeyPairs,
     modernEdKeyPairs,
+    modernWasmXKeyPairs,
+    modernWasmEdKeyPairs,
     modernAxlKeyPairs,
     legacyAxlKeyPairs,
     modernSharedVectors,
     legacySharedVectors,
     sharedExpected,
+    modernWasmSharedVectors,
+    wasmSharedExpected,
     modernAxlSharedVectors,
     legacyAxlSharedVectors,
     axlSharedExpected,
     modernSign32Vectors,
+    modernWasmSign32Vectors,
     legacySign32Vectors,
     modernAxlSign32Vectors,
     legacyAxlSign32Vectors,
     modernSign1024Vectors,
+    modernWasmSign1024Vectors,
     legacySign1024Vectors,
     modernAxlSign1024Vectors,
     legacyAxlSign1024Vectors,
     modernVerify32Vectors,
+    modernWasmVerify32Vectors,
     legacyVerify32Vectors,
     modernAxlVerify32Vectors,
     legacyAxlVerify32Vectors,
     modernVerify1024Vectors,
+    modernWasmVerify1024Vectors,
     legacyVerify1024Vectors,
     modernAxlVerify1024Vectors,
     legacyAxlVerify1024Vectors,
     modernSignMessageVectors,
+    modernWasmSignMessageVectors,
     legacySignMessageVectors,
     modernAxlSignMessageVectors,
     legacyAxlSignMessageVectors,
     modernOpenMessageVectors,
+    modernWasmOpenMessageVectors,
     legacyOpenMessageVectors,
     modernAxlOpenMessageVectors,
     legacyAxlOpenMessageVectors,
@@ -528,6 +587,7 @@ function runPreflightValidation(context, issues, config) {
 
   for (let i = 0; i < count; i += 1) {
     const modernX = context.modernXKeyPairs[i];
+    const modernWasmX = context.modernWasmXKeyPairs[i];
     const legacyX = context.legacyXKeyPairs[i];
     const peerIndex = (i + 1) % count;
 
@@ -550,6 +610,68 @@ function runPreflightValidation(context, issues, config) {
     const modernShared = x25519.sharedKey(modernX.private, context.modernXKeyPairs[peerIndex].public);
     const legacyShared = legacyCurve.sharedKey(legacyX.private, context.legacyXKeyPairs[peerIndex].public);
     assertBytesEqual(`x25519 sharedKey modern vs legacy [${i}]`, modernShared, legacyShared, issues);
+
+    assertBytesEqual(
+      `wasm x25519 generateKeyPair public vs legacy [${i}]`,
+      modernWasmX.public,
+      legacyX.public,
+      issues
+    );
+    assertBytesEqual(
+      `wasm x25519 generateKeyPair private vs legacy [${i}]`,
+      modernWasmX.private,
+      legacyX.private,
+      issues
+    );
+
+    const wasmPublicFromSecret = wasm.x25519.publicKey(clamped);
+    assertBytesEqual(
+      `wasm x25519 publicKey vs legacy [${i}]`,
+      wasmPublicFromSecret,
+      legacyX.public,
+      issues
+    );
+
+    const wasmPrivateKeyObject = wasm.x25519.createPrivateKeyObject(modernWasmX.private);
+    const wasmPeerPublicKeyObject = wasm.x25519.createPublicKeyObject(
+      context.modernWasmXKeyPairs[peerIndex].public
+    );
+    const wasmPublicFromPrivateObject = wasm.x25519.publicKeyFromPrivateKeyObject(wasmPrivateKeyObject);
+    assertBytesEqual(
+      `wasm x25519 publicKeyFromPrivateKeyObject vs legacy [${i}]`,
+      wasmPublicFromPrivateObject,
+      legacyX.public,
+      issues
+    );
+
+    const wasmShared = wasm.x25519.sharedKey(
+      modernWasmX.private,
+      context.modernWasmXKeyPairs[peerIndex].public
+    );
+    assertBytesEqual(`wasm x25519 sharedKey vs legacy [${i}]`, wasmShared, legacyShared, issues);
+
+    const wasmSharedFromObjects = wasm.x25519.sharedKeyFromKeyObjects(
+      wasmPrivateKeyObject,
+      wasmPeerPublicKeyObject
+    );
+    assertBytesEqual(
+      `wasm x25519 sharedKeyFromKeyObjects vs legacy [${i}]`,
+      wasmSharedFromObjects,
+      legacyShared,
+      issues
+    );
+
+    const wasmSharedStrict = wasm.x25519.sharedKeyStrictFromKeyObjects(
+      wasmPrivateKeyObject,
+      wasmPeerPublicKeyObject
+    );
+    assertBytesEqual(
+      `wasm x25519 sharedKeyStrictFromKeyObjects vs legacy [${i}]`,
+      wasmSharedStrict,
+      legacyShared,
+      issues
+    );
+    assertTrue(`wasm x25519 isAllZero32(shared) [${i}]`, !wasm.x25519.isAllZero32(wasmShared), issues);
   }
 
   for (let i = 0; i < count; i += 1) {
@@ -620,8 +742,10 @@ function runPreflightValidation(context, issues, config) {
 
   for (let i = 0; i < count; i += 1) {
     const modern32 = context.modernVerify32Vectors[i];
+    const wasm32 = context.modernWasmVerify32Vectors[i];
     const legacy32 = context.legacyVerify32Vectors[i];
     const modern1024 = context.modernVerify1024Vectors[i];
+    const wasm1024 = context.modernWasmVerify1024Vectors[i];
     const legacy1024 = context.legacyVerify1024Vectors[i];
 
     assertTrue(
@@ -641,6 +765,40 @@ function runPreflightValidation(context, issues, config) {
       issues
     );
     assertTrue(
+      `wasm ed25519 verify(sign(msg32)) [${i}]`,
+      wasm.ed25519.verify(wasm32.public, wasm32.msg, wasm32.signature),
+      issues
+    );
+    const wasmPrivateKeyObject = wasm.ed25519.createPrivateKeyObject(wasm32.seed);
+    const wasmPublicKeyObject = wasm.ed25519.createPublicKeyObject(wasm32.public);
+    const wasmPublicFromPrivateObject = wasm.ed25519.publicKeyFromPrivateKeyObject(wasmPrivateKeyObject);
+    assertBytesEqual(
+      `wasm ed25519 publicKeyFromPrivateKeyObject [${i}]`,
+      wasmPublicFromPrivateObject,
+      wasm32.public,
+      issues
+    );
+    const wasmSignatureFromPrivateObject = wasm.ed25519.signWithPrivateKey(
+      wasmPrivateKeyObject,
+      wasm32.msg
+    );
+    assertBytesEqual(
+      `wasm ed25519 signWithPrivateKey deterministic [${i}]`,
+      wasmSignatureFromPrivateObject,
+      wasm32.signature,
+      issues
+    );
+    assertTrue(
+      `wasm ed25519 verifyWithPublicKey(sign(msg32)) [${i}]`,
+      wasm.ed25519.verifyWithPublicKey(wasmPublicKeyObject, wasm32.msg, wasm32.signature),
+      issues
+    );
+    assertTrue(
+      `wasm ed25519 verify(sign(msg1024)) [${i}]`,
+      wasm.ed25519.verify(wasm1024.public, wasm1024.msg, wasm1024.signature),
+      issues
+    );
+    assertTrue(
       `legacy verify(sign(msg1024)) [${i}]`,
       legacyCurve.verify(legacy1024.public, legacy1024.msg, legacy1024.signature),
       issues
@@ -651,6 +809,10 @@ function runPreflightValidation(context, issues, config) {
 
     const modernOpened = ed25519.openMessage(modernSigned.public, modernSigned.signed);
     assertPayloadEqual(`ed25519 signMessage/openMessage [${i}]`, modernOpened, modernSigned.msg, issues);
+
+    const wasmSigned = context.modernWasmOpenMessageVectors[i];
+    const wasmOpened = wasm.ed25519.openMessage(wasmSigned.public, wasmSigned.signed);
+    assertPayloadEqual(`wasm ed25519 signMessage/openMessage [${i}]`, wasmOpened, wasmSigned.msg, issues);
 
     const legacyOpened = legacyCurve.openMessage(legacySigned.public, copyU8(legacySigned.signed));
     assertPayloadEqual(`legacy signMessage/openMessage [${i}]`, legacyOpened, legacySigned.msg, issues);
@@ -922,6 +1084,224 @@ function buildModernTasksForVariant(context, variant, issues, config) {
         verify: (opened) => {
           const input = last.value;
           assertPayloadEqual("modern openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+  };
+}
+
+function buildModernWasmTasksForVariant(context, variant, issues) {
+  const n = context.vectorCount;
+
+  const nextSeed = createCycler(context.seeds32);
+  const nextShared = createCycler(context.modernWasmSharedVectors);
+  const nextSign32 = createCycler(context.modernWasmSign32Vectors);
+  const nextSign1024 = createCycler(context.modernWasmSign1024Vectors);
+  const nextVerify32 = createCycler(context.modernWasmVerify32Vectors);
+  const nextVerify1024 = createCycler(context.modernWasmVerify1024Vectors);
+  const nextSignMessage = createCycler(context.modernWasmSignMessageVectors);
+  const nextOpenMessage = createCycler(context.modernWasmOpenMessageVectors);
+
+  const makeWasmSign = (vector, msg) => {
+    if (variant === "cached") {
+      const msgInput = variant === "copy" ? copyU8(msg) : msg;
+      return wasm.ed25519.signWithPrivateKey(
+        context.cached.wasm.ed25519.privateKeys[vector.index],
+        msgInput
+      );
+    }
+
+    const seedInput = variant === "copy" ? asBytes32(copyU8(vector.seed), "seed copy") : vector.seed;
+    const msgInput = maybeCopyU8(msg, variant === "copy");
+    return wasm.ed25519.sign(seedInput, msgInput);
+  };
+
+  const makeWasmVerify = (vector) => {
+    const msgInput = maybeCopyU8(vector.msg, variant === "copy");
+    const signatureInput = variant === "copy" ? asBytes64(copyU8(vector.signature), "signature copy") : vector.signature;
+
+    if (variant === "cached") {
+      return wasm.ed25519.verifyWithPublicKey(
+        context.cached.wasm.ed25519.publicKeys[vector.index],
+        msgInput,
+        signatureInput
+      );
+    }
+
+    const publicInput = variant === "copy" ? asBytes32(copyU8(vector.public), "public key copy") : vector.public;
+    return wasm.ed25519.verify(publicInput, msgInput, signatureInput);
+  };
+
+  return {
+    generateKeyPair: (() => {
+      let last = null;
+      return {
+        name: "modern wasm.x25519.generateKeyPair",
+        run: () => {
+          const selected = nextSeed();
+          last = selected;
+          const seed = selected.value;
+          if (variant === "cached") {
+            const privateObject = context.cached.wasm.x25519.privateKeys[selected.index];
+            return {
+              public: wasm.x25519.publicKeyFromPrivateKeyObject(privateObject),
+              private: privateObject.bytes,
+            };
+          }
+          const seedInput = variant === "copy" ? asBytes32(copyU8(seed), "seed copy") : seed;
+          return wasm.x25519.generateKeyPair(seedInput);
+        },
+        verify: (result) => {
+          const expected = context.modernWasmXKeyPairs[last.index];
+          assertBytesEqual("modern wasm generateKeyPair public", result.public, expected.public, issues);
+          assertBytesEqual("modern wasm generateKeyPair private", result.private, expected.private, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sharedKey: (() => {
+      let last = null;
+      return {
+        name: "modern wasm.x25519.sharedKey",
+        run: () => {
+          const selected = nextShared();
+          last = selected;
+          const input = selected.value;
+          if (variant === "cached") {
+            return wasm.x25519.sharedKeyFromKeyObjects(
+              context.cached.wasm.x25519.privateKeys[input.index],
+              context.cached.wasm.x25519.publicKeys[(input.index + 1) % n]
+            );
+          }
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+          return wasm.x25519.sharedKey(secretInput, publicInput);
+        },
+        verify: (result) => {
+          const expected = context.wasmSharedExpected[last.index];
+          assertBytesEqual("modern wasm sharedKey", result, expected, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sign32: (() => {
+      let last = null;
+      return {
+        name: "modern wasm.ed25519.sign",
+        run: () => {
+          const selected = nextSign32();
+          last = selected;
+          return makeWasmSign(selected.value, selected.value.msg);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern wasm sign(msg32) verifies",
+            wasm.ed25519.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    sign1024: (() => {
+      let last = null;
+      return {
+        name: "modern wasm.ed25519.sign",
+        run: () => {
+          const selected = nextSign1024();
+          last = selected;
+          return makeWasmSign(selected.value, selected.value.msg);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern wasm sign(msg1024) verifies",
+            wasm.ed25519.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    verify32: {
+      name: "modern wasm.ed25519.verify",
+      run: () => makeWasmVerify(nextVerify32().value),
+      verify: (ok) => {
+        assertTrue("modern wasm verify(msg32)", ok, issues);
+      },
+      samples: [],
+    },
+    verify1024: {
+      name: "modern wasm.ed25519.verify",
+      run: () => makeWasmVerify(nextVerify1024().value),
+      verify: (ok) => {
+        assertTrue("modern wasm verify(msg1024)", ok, issues);
+      },
+      samples: [],
+    },
+    signMessage: (() => {
+      let last = null;
+      return {
+        name: "modern wasm.ed25519.signMessage",
+        run: () => {
+          const selected = nextSignMessage();
+          last = selected;
+          const v = selected.value;
+
+          if (variant === "cached") {
+            const msgInput = variant === "copy" ? copyU8(v.msg) : v.msg;
+            const signature = wasm.ed25519.signWithPrivateKey(
+              context.cached.wasm.ed25519.privateKeys[v.index],
+              msgInput
+            );
+            const out = new Uint8Array(64 + msgInput.byteLength);
+            out.set(signature, 0);
+            out.set(msgInput, 64);
+            return out;
+          }
+
+          const seedInput = variant === "copy" ? asBytes32(copyU8(v.seed), "seed copy") : v.seed;
+          const msgInput = maybeCopyU8(v.msg, variant === "copy");
+          return wasm.ed25519.signMessage(seedInput, msgInput);
+        },
+        verify: (signed) => {
+          const input = last.value;
+          const opened = wasm.ed25519.openMessage(input.public, signed);
+          assertPayloadEqual("modern wasm signMessage/openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    openMessage: (() => {
+      let last = null;
+      return {
+        name: "modern wasm.ed25519.openMessage",
+        run: () => {
+          const selected = nextOpenMessage();
+          last = selected;
+          const input = selected.value;
+          const signedInput = makeSafeOpenInput(variant, input.signed, variant !== "nocopy");
+
+          if (variant === "cached") {
+            const signature = asBytes64(signedInput.subarray(0, 64), "signature");
+            const msg = signedInput.subarray(64);
+            const ok = wasm.ed25519.verifyWithPublicKey(
+              context.cached.wasm.ed25519.publicKeys[input.index],
+              msg,
+              signature
+            );
+            if (!ok) return null;
+            return new Uint8Array(msg);
+          }
+
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public key copy") : input.public;
+          return wasm.ed25519.openMessage(publicInput, signedInput);
+        },
+        verify: (opened) => {
+          const input = last.value;
+          assertPayloadEqual("modern wasm openMessage", opened, input.msg, issues);
         },
         samples: [],
       };
@@ -1575,111 +1955,164 @@ function buildLegacyAxlTasksForVariant(context, variant, issues) {
 }
 
 function buildPairDescriptors(context, variant, issues, config) {
-  const modern = buildModernTasksForVariant(context, variant, issues, config);
-  const legacy = buildLegacyTasksForVariant(context, variant, issues);
-  const modernAxl = buildModernAxlTasksForVariant(context, variant, issues);
-  const legacyAxl = buildLegacyAxlTasksForVariant(context, variant, issues);
+  const modernVsLegacy = (modernKey, legacyKey = modernKey) => {
+    const modern = buildModernTasksForVariant(context, variant, issues, config);
+    const legacy = buildLegacyTasksForVariant(context, variant, issues);
+    return [modern[modernKey], legacy[legacyKey]];
+  };
+
+  const wasmVsLegacy = (wasmKey, legacyKey = wasmKey) => {
+    const modernWasm = buildModernWasmTasksForVariant(context, variant, issues);
+    const legacy = buildLegacyTasksForVariant(context, variant, issues);
+    return [modernWasm[wasmKey], legacy[legacyKey]];
+  };
+
+  const axlsignVsLegacy = (modernKey, legacyKey = modernKey) => {
+    const modernAxl = buildModernAxlTasksForVariant(context, variant, issues);
+    const legacyAxl = buildLegacyAxlTasksForVariant(context, variant, issues);
+    return [modernAxl[modernKey], legacyAxl[legacyKey]];
+  };
 
   return [
     {
       id: `x25519.generateKeyPair.${variant}`,
       label: `[${variant}] X25519 generateKeyPair(seed32)`,
-      tasks: [modern.generateKeyPair, legacy.generateKeyPair],
+      tasks: modernVsLegacy("generateKeyPair"),
     },
     {
       id: `x25519.sharedKey.${variant}`,
       label: `[${variant}] X25519 sharedKey(sk, pk)`,
-      tasks: [modern.sharedKey, legacy.sharedKey],
+      tasks: modernVsLegacy("sharedKey"),
+    },
+    {
+      id: `wasm.x25519.generateKeyPair.${variant}`,
+      label: `[${variant}] WASM X25519 generateKeyPair(seed32)`,
+      tasks: wasmVsLegacy("generateKeyPair"),
+    },
+    {
+      id: `wasm.x25519.sharedKey.${variant}`,
+      label: `[${variant}] WASM X25519 sharedKey(sk, pk)`,
+      tasks: wasmVsLegacy("sharedKey"),
     },
     {
       id: `axlsign.generateKeyPair.${variant}`,
       label: `[${variant}] axlsign generateKeyPair(seed32)`,
-      tasks: [modernAxl.generateKeyPair, legacyAxl.generateKeyPair],
+      tasks: axlsignVsLegacy("generateKeyPair"),
     },
     {
       id: `axlsign.sharedKey.${variant}`,
       label: `[${variant}] axlsign sharedKey(sk, pk)`,
-      tasks: [modernAxl.sharedKey, legacyAxl.sharedKey],
+      tasks: axlsignVsLegacy("sharedKey"),
     },
     {
       id: `axlsign.sign.32.${variant}`,
       label: `[${variant}] axlsign sign(msg32) [equivalent schemes]`,
-      tasks: [modernAxl.sign32, legacyAxl.sign32],
+      tasks: axlsignVsLegacy("sign32"),
     },
     {
       id: `axlsign.sign.32.rnd.${variant}`,
       label: `[${variant}] axlsign sign(msg32,opt_random) [equivalent schemes]`,
-      tasks: [modernAxl.sign32Rnd, legacyAxl.sign32Rnd],
+      tasks: axlsignVsLegacy("sign32Rnd"),
     },
     {
       id: `axlsign.sign.1024.${variant}`,
       label: `[${variant}] axlsign sign(msg1024) [equivalent schemes]`,
-      tasks: [modernAxl.sign1024, legacyAxl.sign1024],
+      tasks: axlsignVsLegacy("sign1024"),
     },
     {
       id: `axlsign.verify.32.${variant}`,
       label: `[${variant}] axlsign verify(msg32) [equivalent schemes]`,
-      tasks: [modernAxl.verify32, legacyAxl.verify32],
+      tasks: axlsignVsLegacy("verify32"),
     },
     {
       id: `axlsign.verify.32.rnd.${variant}`,
       label: `[${variant}] axlsign verify(msg32,opt_random) [equivalent schemes]`,
-      tasks: [modernAxl.verify32Rnd, legacyAxl.verify32Rnd],
+      tasks: axlsignVsLegacy("verify32Rnd"),
     },
     {
       id: `axlsign.verify.1024.${variant}`,
       label: `[${variant}] axlsign verify(msg1024) [equivalent schemes]`,
-      tasks: [modernAxl.verify1024, legacyAxl.verify1024],
+      tasks: axlsignVsLegacy("verify1024"),
     },
     {
       id: `axlsign.signMessage.256.${variant}`,
       label: `[${variant}] axlsign signMessage(msg256) [equivalent schemes]`,
-      tasks: [modernAxl.signMessage, legacyAxl.signMessage],
+      tasks: axlsignVsLegacy("signMessage"),
     },
     {
       id: `axlsign.signMessage.256.rnd.${variant}`,
       label: `[${variant}] axlsign signMessage(msg256,opt_random) [equivalent schemes]`,
-      tasks: [modernAxl.signMessageRnd, legacyAxl.signMessageRnd],
+      tasks: axlsignVsLegacy("signMessageRnd"),
     },
     {
       id: `axlsign.openMessage.256.${variant}`,
       label: `[${variant}] axlsign openMessage(msg256) [equivalent schemes]`,
-      tasks: [modernAxl.openMessage, legacyAxl.openMessage],
+      tasks: axlsignVsLegacy("openMessage"),
     },
     {
       id: `axlsign.openMessage.256.rnd.${variant}`,
       label: `[${variant}] axlsign openMessage(msg256,opt_random) [equivalent schemes]`,
-      tasks: [modernAxl.openMessageRnd, legacyAxl.openMessageRnd],
+      tasks: axlsignVsLegacy("openMessageRnd"),
     },
     {
       id: `sign.32.${variant}`,
       label: `[${variant}] Signature sign(msg32) [different schemes]`,
-      tasks: [modern.sign32, legacy.sign32],
+      tasks: modernVsLegacy("sign32"),
+    },
+    {
+      id: `wasm.sign.32.${variant}`,
+      label: `[${variant}] WASM Signature sign(msg32) [different schemes]`,
+      tasks: wasmVsLegacy("sign32"),
     },
     {
       id: `sign.1024.${variant}`,
       label: `[${variant}] Signature sign(msg1024) [different schemes]`,
-      tasks: [modern.sign1024, legacy.sign1024],
+      tasks: modernVsLegacy("sign1024"),
+    },
+    {
+      id: `wasm.sign.1024.${variant}`,
+      label: `[${variant}] WASM Signature sign(msg1024) [different schemes]`,
+      tasks: wasmVsLegacy("sign1024"),
     },
     {
       id: `verify.32.${variant}`,
       label: `[${variant}] Signature verify(msg32) [different schemes]`,
-      tasks: [modern.verify32, legacy.verify32],
+      tasks: modernVsLegacy("verify32"),
+    },
+    {
+      id: `wasm.verify.32.${variant}`,
+      label: `[${variant}] WASM Signature verify(msg32) [different schemes]`,
+      tasks: wasmVsLegacy("verify32"),
     },
     {
       id: `verify.1024.${variant}`,
       label: `[${variant}] Signature verify(msg1024) [different schemes]`,
-      tasks: [modern.verify1024, legacy.verify1024],
+      tasks: modernVsLegacy("verify1024"),
+    },
+    {
+      id: `wasm.verify.1024.${variant}`,
+      label: `[${variant}] WASM Signature verify(msg1024) [different schemes]`,
+      tasks: wasmVsLegacy("verify1024"),
     },
     {
       id: `signMessage.256.${variant}`,
       label: `[${variant}] signMessage(msg256)`,
-      tasks: [modern.signMessage, legacy.signMessage],
+      tasks: modernVsLegacy("signMessage"),
+    },
+    {
+      id: `wasm.signMessage.256.${variant}`,
+      label: `[${variant}] WASM signMessage(msg256)`,
+      tasks: wasmVsLegacy("signMessage"),
     },
     {
       id: `openMessage.256.${variant}`,
       label: `[${variant}] openMessage(msg256)`,
-      tasks: [modern.openMessage, legacy.openMessage],
+      tasks: modernVsLegacy("openMessage"),
+    },
+    {
+      id: `wasm.openMessage.256.${variant}`,
+      label: `[${variant}] WASM openMessage(msg256)`,
+      tasks: wasmVsLegacy("openMessage"),
     },
   ];
 }
