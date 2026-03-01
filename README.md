@@ -1,6 +1,8 @@
 # @unknownncat/curve25519-node
 
-Modern zero-dependency X25519 + Ed25519 for Node.js using OpenSSL via `node:crypto`.
+> 🇺🇸 English version: [README.en.md](./README.en.md)
+
+Implementação moderna, sem dependências de runtime, de X25519 + Ed25519 para Node.js usando OpenSSL via `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@unknownncat/curve25519-node)](https://www.npmjs.com/package/@unknownncat/curve25519-node)
 [![node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -10,13 +12,13 @@ Modern zero-dependency X25519 + Ed25519 for Node.js using OpenSSL via `node:cryp
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 - Node: `>= 20`
-- Runtime deps: `0`
-- TypeScript: strict
-- Module format: ESM + CJS
+- Dependências de runtime: `0`
+- TypeScript: `strict`
+- Formatos de módulo: ESM + CJS
 
 ---
 
-## Install
+## Instalação
 
 ```bash
 npm i @unknownncat/curve25519-node
@@ -24,7 +26,7 @@ npm i @unknownncat/curve25519-node
 
 ---
 
-## Quick Usage
+## Uso Rápido
 
 ```ts
 import { randomBytes } from "node:crypto";
@@ -36,9 +38,9 @@ const bobSeed = asBytes32(randomBytes(32));
 const aliceX = x25519.generateKeyPair(aliceSeed);
 const bobX = x25519.generateKeyPair(bobSeed);
 
-const secret1 = x25519.sharedKey(aliceX.private, bobX.public);
-const secret2 = x25519.sharedKey(bobX.private, aliceX.public);
-// secret1 === secret2
+const segredo1 = x25519.sharedKey(aliceX.private, bobX.public);
+const segredo2 = x25519.sharedKey(bobX.private, aliceX.public);
+// segredo1 === segredo2
 
 const signerSeed = asBytes32(randomBytes(32));
 const signer = ed25519.generateKeyPair(signerSeed);
@@ -70,100 +72,90 @@ const { x25519, ed25519, asBytes32 } = require("@unknownncat/curve25519-node");
 - `generateKeyPair(seed32: Bytes32): { public: Bytes32; private: Bytes32 }`
 - `sign(secretSeed32: Bytes32, msg: Uint8Array): Bytes64`
 - `verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes64): boolean`
-- `signMessage(secretSeed32: Bytes32, msg: Uint8Array): Uint8Array` (`signature || message`)
+- `signMessage(secretSeed32: Bytes32, msg: Uint8Array): Uint8Array` (`assinatura || mensagem`)
 - `openMessage(publicKey32: Bytes32, signedMsg: Uint8Array): Uint8Array | null`
 
-### Top-level compat aliases
+### Aliases de compatibilidade (top-level)
 
 - `sharedKey = x25519.sharedKey`
 - `generateKeyPair = x25519.generateKeyPair`
-- `sign`, `verify`, `signMessage`, `openMessage` (Ed25519 semantics)
+- `sign`, `verify`, `signMessage`, `openMessage` (semântica Ed25519)
 - `generateKeyPairX25519`, `generateKeyPairEd25519`
 
 ---
 
-## Compatibility Notes
+## Notas de Compatibilidade
 
-This package does **not** implement `axlsign` from `curve25519-js`.
+Este pacote **não implementa o esquema axlsign** do `curve25519-js`.
 
-It follows standard split usage:
+Ele segue o modelo padrão moderno:
 
-- key agreement: **X25519**
-- signatures: **Ed25519**
+- acordo de chave: **X25519**
+- assinatura: **Ed25519**
 
-| Feature                   | curve25519-js | curve25519-node    |
-| ------------------------- | ------------- | ------------------ |
-| Signing scheme            | axlsign       | Ed25519 (standard) |
-| Key agreement             | X25519        | X25519             |
-| Same key for sign + ECDH  | sim           | não                |
-| `opt_random` in sign APIs | sim           | não                |
-| OpenSSL backend           | não           | sim                |
+| Recurso | `curve25519-js` | `curve25519-node` |
+| --- | --- | --- |
+| Esquema de assinatura | axlsign | Ed25519 (padrão) |
+| Acordo de chave | X25519 | X25519 |
+| Mesma chave para assinatura + ECDH | sim | não |
+| `opt_random` nas APIs de assinatura | sim | não |
+| Backend OpenSSL | não | sim |
 
-Important:
+Importante:
 
-- X25519 public keys and Ed25519 public keys are different.
-- `node:crypto` does not expose X25519 public key ↔ Ed25519 public key conversion APIs.
-- `sign`/`signMessage` keep a 3rd optional argument only for call-shape compatibility, but throw if provided (`opt_random` unsupported).
-- Ed25519 signatures here are deterministic (OpenSSL default).
-
----
-
-## Why This Exists
-
-`curve25519-js` is a good project, but it uses manual finite-field arithmetic in JS (`Float64Array`, TweetNaCl-style internals).
-
-This package targets modern Node with OpenSSL primitives:
-
-- safer default implementation path
-- faster operations in Node >= 20
-- smaller, explicit API surface
-- strict typing and zero runtime dependencies
+- Chaves públicas X25519 e Ed25519 são diferentes.
+- `node:crypto` não expõe API para converter public key X25519 ↔ Ed25519.
+- `sign` e `signMessage` mantêm o 3º argumento opcional apenas por compatibilidade de chamada, mas lançam erro se for fornecido (`opt_random` não suportado).
+- Assinaturas Ed25519 aqui são determinísticas (comportamento padrão do OpenSSL).
 
 ---
 
-## Branded Types
+## Motivação
+
+O `curve25519-js` é um projeto importante, mas usa aritmética de campo manual em JS (`Float64Array`, estilo TweetNaCl).
+
+Este pacote foca em Node moderno com primitivas do OpenSSL:
+
+- caminho de implementação mais seguro
+- melhor desempenho em Node >= 20
+- API menor e explícita
+- tipagem forte com zero dependências de runtime
+
+---
+
+## Tipos Branded
 
 - `Bytes32`
 - `Bytes64`
 
-Helpers (validation without copy):
+Helpers (validam sem copiar):
 
 - `asBytes32(u8)`
 - `asBytes64(u8)`
 
 ---
 
-Aqui está a tabela organizada e corrigida (com colunas alinhadas e sem quebra extra). Também removi a coluna vazia no final e padronizei os títulos.
+## Mapa de RFCs (uso no projeto)
 
-## RFC Map (what is used in this project)
+| RFC | Seções usadas | Uso no projeto | Onde no código |
+| --- | --- | --- | --- |
+| RFC 7748 (X25519) | Seção 5 (`The X25519 and X448 Functions`) | Regras de clamping/decoding do escalar e comportamento da função X25519 (zera 3 bits baixos, zera bit mais alto, seta o segundo bit mais alto). | `src/x25519.ts` |
+| RFC 7748 (X25519) | Seção 5.2 (`Test Vectors`), Seção 6.1 (`Diffie-Hellman / Curve25519`) | Vetores oficiais para validação de interoperabilidade e corretude. | `test/x25519.test.mjs` |
+| RFC 8032 (Ed25519) | Seção 5.1.5 (`Key Generation`), 5.1.6 (`Sign`), 5.1.7 (`Verify`) | Semântica de keygen/sign/verify Ed25519 (executada por OpenSSL via `node:crypto`). | `src/ed25519.ts` |
+| RFC 8032 (Ed25519) | Seção 7.1 (`Test Vectors for Ed25519`) | Vetores determinísticos para validação de chave pública e assinatura. | `test/ed25519.test.mjs` |
+| RFC 8410 (X25519/Ed25519 em PKIX) | Seção 3 (identificadores de algoritmo), Seção 4 (`Subject Public Key Fields`), Seção 7 (`Private Key Format`) | Estrutura DER para import/export de chaves raw de 32 bytes em SPKI/PKCS#8 com OIDs de X25519 e Ed25519. | `src/internal/der.ts` |
 
-| RFC                                 | Sections used                                                                                             | How it is used here                                                                                                         | Where in project        |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| RFC 7748 (X25519)                   | Section 5 — _The X25519 and X448 Functions_                                                               | Scalar decoding / clamping and X25519 behavior (clear low 3 bits, clear top bit, set second-top bit) following X25519 rules | `src/x25519.ts`         |
-| RFC 7748 (X25519)                   | Section 5.2 — _Test Vectors_, Section 6.1 — _Diffie-Hellman / Curve25519_                                 | Validation using official vectors to ensure interoperability and correctness                                                | `test/x25519.test.mjs`  |
-| RFC 8032 (Ed25519)                  | Section 5.1.5 — _Key Generation_, 5.1.6 — _Sign_, 5.1.7 — _Verify_                                        | Ed25519 keygen/sign/verify semantics implemented through OpenSSL via `node:crypto`                                          | `src/ed25519.ts`        |
-| RFC 8032 (Ed25519)                  | Section 7.1 — _Test Vectors for Ed25519_                                                                  | Deterministic test vectors for public key and signature verification                                                        | `test/ed25519.test.mjs` |
-| RFC 8410 (X25519 / Ed25519 in PKIX) | Section 3 — _Algorithm identifiers_, Section 4 — _SubjectPublicKeyInfo_, Section 7 — _Private Key Format_ | DER/SPKI/PKCS#8 encoding for raw 32-byte keys using Ed25519/X25519 OIDs                                                     | `src/internal/der.ts`   |
+Referências indiretas por estrutura ASN.1/PKIX:
 
----
+- RFC 5958 (OneAsymmetricKey / família PKCS#8)
+- RFC 5280, Seção 4.1.2.7 (`Subject Public Key Info`)
 
-## Indirectly referenced through RFC 8410 structures
+Observações:
 
-| RFC      | Section                                | Usage                                               |
-| -------- | -------------------------------------- | --------------------------------------------------- |
-| RFC 5958 | OneAsymmetricKey / PKCS#8              | Private key container structure used by PKCS#8      |
-| RFC 5280 | Section 4.1.2.7 — SubjectPublicKeyInfo | Public key SPKI structure used in DER export/import |
+- O projeto não reimplementa aritmética de curva em JS; as operações criptográficas usam OpenSSL via `node:crypto`.
+- A suíte de testes cobre vetores oficiais do RFC 7748 e RFC 8032.
 
----
-
-## Notes
-
-- This project **does not reimplement curve arithmetic in JS**.
-- All cryptographic primitives are delegated to **OpenSSL via `node:crypto`**.
-- Test suite includes **official vectors from RFC 7748 and RFC 8032**.
-- DER encoding follows **RFC 8410 + PKCS#8 + SPKI layout exactly**, ensuring interop with OpenSSL / WebCrypto / libsodium / libsignal.
-
-Run:
+Rodar testes:
 
 ```bash
 npm test
@@ -171,42 +163,42 @@ npm test
 
 ---
 
-## Technical Details (RFC 8410 DER)
+## Detalhes Técnicos (DER / RFC 8410)
 
-Raw 32-byte keys are imported/exported via DER with fixed prefixes:
+Chaves raw de 32 bytes são importadas/exportadas com prefixos fixos:
 
 - X25519 PKCS#8: `302e020100300506032b656e04220420`
 - X25519 SPKI: `302a300506032b656e032100`
 - Ed25519 PKCS#8: `302e020100300506032b657004220420`
 - Ed25519 SPKI: `302a300506032b6570032100`
 
-Implementation notes:
+Notas de implementação:
 
-- preallocated buffers + `.set`
-- zero-copy `Uint8Array` views where safe
-- no `Buffer.concat` in hot paths
-
----
-
-## Performance Notes
-
-- Avoids unnecessary byte copies in critical paths.
-- `signMessage` builds `signature || message` using one preallocated `Uint8Array`.
-- For high-throughput loops, caching `KeyObject` in application code can reduce ASN.1 parse overhead.
+- buffers prealocados + `.set`
+- views zero-copy de `Uint8Array` quando seguro
+- sem `Buffer.concat` em hot path
 
 ---
 
-## Security Notes
+## Notas de Performance
 
-- strict type/length validation on public APIs
-- no secret logging
-- `timingSafeEqual` used where fixed-byte comparisons are needed internally
+- Evita cópias desnecessárias de bytes nos caminhos críticos.
+- `signMessage` monta `assinatura || mensagem` com um único `Uint8Array` prealocado.
+- Para throughput máximo em loops longos, cache de `KeyObject` no nível da aplicação reduz overhead de parse ASN.1.
+
+---
+
+## Notas de Segurança
+
+- validação estrita de tipo/tamanho nas APIs públicas
+- sem log de segredos
+- `timingSafeEqual` em comparações internas de tamanho fixo quando necessário
 
 ---
 
 ## Benchmarks
 
-Benchmark suite is isolated in `bench/` (separate subproject) and compares against `curve25519-js`.
+A suíte de benchmark fica isolada em `bench/` (subprojeto separado) e compara com `curve25519-js`.
 
 ```bash
 npm run build
@@ -215,63 +207,63 @@ npm install
 npm run bench
 ```
 
-### Real benchmark snapshot (`npm run bench:full`) on GitHub Codespaces
+### Snapshot real de benchmark (`npm run bench:full`) no GitHub Codespaces
 
-Command:
+Comando:
 
 ```bash
 node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --variants=raw,cached,nocopy,copy --verifyDuringBench --verifyEvery=64
 ```
 
-Environment:
+Ambiente:
 
 - Node: `v24.11.1`
 - OpenSSL: `3.5.4`
 - CPU: `AMD EPYC 7763 64-Core Processor`
-- Logical cores: `4`
-- Vectors: `64`
+- Cores lógicos: `4`
+- Vetores: `64`
 
-Selected results (mean ops/s):
+Resultados selecionados (média em ops/s):
 
-| Variant | Operation                    | Modern | Legacy (`curve25519-js`) | Speedup |
-| ------- | ---------------------------- | -----: | -----------------------: | ------: |
-| raw     | x25519.generateKeyPair       | 14,201 |                    1,627 |   8.73x |
-| raw     | x25519.sharedKey             |  9,985 |                    1,634 |   6.11x |
-| raw     | ed25519.sign (msg32)         | 11,174 |                      145 |  77.08x |
-| raw     | ed25519.verify (msg32)       |  7,413 |                      146 |  50.76x |
-| raw     | ed25519.signMessage (msg256) | 10,952 |                      145 |  75.45x |
-| raw     | ed25519.openMessage (msg256) |  7,199 |                      143 |  50.30x |
-| cached  | x25519.generateKeyPair       | 48,553 |                    1,624 |  29.90x |
-| cached  | x25519.sharedKey             | 25,283 |                    1,641 |  15.41x |
-| cached  | ed25519.sign (msg32)         | 24,345 |                      142 | 171.00x |
-| cached  | ed25519.verify (msg32)       |  8,184 |                      145 |  56.42x |
-| cached  | ed25519.signMessage (msg256) | 23,410 |                      135 | 173.56x |
-| cached  | ed25519.openMessage (msg256) |  8,118 |                      145 |  56.07x |
-| nocopy  | x25519.sharedKey             | 10,383 |                    1,617 |   6.42x |
-| nocopy  | ed25519.sign (msg32)         | 11,170 |                      145 |  77.18x |
-| copy    | x25519.sharedKey             | 10,292 |                    1,617 |   6.37x |
-| copy    | ed25519.sign (msg32)         | 10,922 |                      145 |  75.40x |
+| Variante | Operação | Moderno | Legado (`curve25519-js`) | Speedup |
+| --- | --- | ---: | ---: | ---: |
+| raw | x25519.generateKeyPair | 14,201 | 1,627 | 8.73x |
+| raw | x25519.sharedKey | 9,985 | 1,634 | 6.11x |
+| raw | ed25519.sign (msg32) | 11,174 | 145 | 77.08x |
+| raw | ed25519.verify (msg32) | 7,413 | 146 | 50.76x |
+| raw | ed25519.signMessage (msg256) | 10,952 | 145 | 75.45x |
+| raw | ed25519.openMessage (msg256) | 7,199 | 143 | 50.30x |
+| cached | x25519.generateKeyPair | 48,553 | 1,624 | 29.90x |
+| cached | x25519.sharedKey | 25,283 | 1,641 | 15.41x |
+| cached | ed25519.sign (msg32) | 24,345 | 142 | 171.00x |
+| cached | ed25519.verify (msg32) | 8,184 | 145 | 56.42x |
+| cached | ed25519.signMessage (msg256) | 23,410 | 135 | 173.56x |
+| cached | ed25519.openMessage (msg256) | 8,118 | 145 | 56.07x |
+| nocopy | x25519.sharedKey | 10,383 | 1,617 | 6.42x |
+| nocopy | ed25519.sign (msg32) | 11,170 | 145 | 77.18x |
+| copy | x25519.sharedKey | 10,292 | 1,617 | 6.37x |
+| copy | ed25519.sign (msg32) | 10,922 | 145 | 75.40x |
 
-Notes:
+Notas:
 
-- `cached` isolates cryptographic throughput better by reusing `KeyObject` on the modern side.
-- `raw` / `copy` / `nocopy` are closer to API-level end-to-end cost.
-- `sign`/`verify` comparisons measure API throughput, not cryptographic equivalence (`axlsign` vs Ed25519 standard).
+- `cached` isola melhor o throughput criptográfico por reuso de `KeyObject` no lado moderno.
+- `raw` / `copy` / `nocopy` ficam mais próximos do custo fim-a-fim de API.
+- comparações de `sign`/`verify` medem throughput de API, não equivalência criptográfica (`axlsign` vs Ed25519 padrão).
 
 ---
 
-## License
+## Licença
 
 MIT
 
 ---
 
-## Credits
+## Créditos
 
 - [curve25519-js](https://github.com/harveyconnor/curve25519-js) (Harvey Connor, Dmitry Chestnykh)
 - [TweetNaCl.js](https://tweetnacl.js.org/)
-- Trevor Perrin, "Curve25519 signatures" concept note: <https://moderncrypto.org/mail-archive/curves/2014/000205.html>
-- [Node.js `crypto` documentation](https://nodejs.org/api/crypto.html)
+- Trevor Perrin, ideia de assinaturas Curve25519: <https://moderncrypto.org/mail-archive/curves/2014/000205.html>
+- [Documentação Node.js `crypto`](https://nodejs.org/api/crypto.html)
 - [OpenSSL](https://www.openssl.org/)
 - [RFC 7748](https://www.rfc-editor.org/rfc/rfc7748)
 - [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032)
