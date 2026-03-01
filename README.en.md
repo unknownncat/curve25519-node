@@ -2,7 +2,10 @@
 
 > 🇧🇷 Versão em português (principal): [README.md](./README.md)
 
-Modern, zero-runtime-dependency X25519 + Ed25519 for Node.js using OpenSSL through `node:crypto`.
+Zero-runtime-dependency implementation of:
+
+- X25519 + Ed25519 (modern mode via OpenSSL in `node:crypto`)
+- legacy axlsign (optional WASM mode, compatible with `curve25519-js`)
 
 [![npm](https://img.shields.io/npm/v/@unknownncat/curve25519-node)](https://www.npmjs.com/package/@unknownncat/curve25519-node)
 [![node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -56,6 +59,17 @@ CommonJS:
 const { x25519, ed25519, asBytes32 } = require("@unknownncat/curve25519-node");
 ```
 
+Legacy axlsign via WASM:
+
+```ts
+import { asBytes32, axlsign } from "@unknownncat/curve25519-node";
+
+const seed = asBytes32(new Uint8Array(32));
+const kp = axlsign.generateKeyPair(seed); // curve25519-js-compatible X25519 keypair
+const sig = axlsign.sign(kp.private, new TextEncoder().encode("hello"), new Uint8Array(64));
+const ok = axlsign.verify(kp.public, new TextEncoder().encode("hello"), sig);
+```
+
 ---
 
 ## API
@@ -75,6 +89,16 @@ const { x25519, ed25519, asBytes32 } = require("@unknownncat/curve25519-node");
 - `signMessage(secretSeed32: Bytes32, msg: Uint8Array): Uint8Array` (`signature || message`)
 - `openMessage(publicKey32: Bytes32, signedMsg: Uint8Array): Uint8Array | null`
 
+### `axlsign` (legacy compatibility via WASM)
+
+- `publicKey(secretKey32: Bytes32): Bytes32`
+- `sharedKey(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32`
+- `generateKeyPair(seed32: Bytes32): { public: Bytes32; private: Bytes32 }`
+- `sign(secretKey32: Bytes32, msg: Uint8Array, opt_random?: Bytes64): Bytes64`
+- `verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes64): boolean`
+- `signMessage(secretKey32: Bytes32, msg: Uint8Array, opt_random?: Bytes64): Uint8Array`
+- `openMessage(publicKey32: Bytes32, signedMsg: Uint8Array): Uint8Array | null`
+
 ### Top-level compatibility aliases
 
 - `sharedKey = x25519.sharedKey`
@@ -86,26 +110,26 @@ const { x25519, ed25519, asBytes32 } = require("@unknownncat/curve25519-node");
 
 ## Compatibility Notes
 
-This package does **not** implement `axlsign` from `curve25519-js`.
+This package provides two modes:
 
-It follows a modern standard split:
-
-- key agreement: **X25519**
-- signatures: **Ed25519**
+- **modern (recommended):** `x25519` + `ed25519` via `node:crypto`
+- **legacy:** `axlsign` via WASM for `curve25519-js` compatibility
 
 | Feature | `curve25519-js` | `curve25519-node` |
 | --- | --- | --- |
-| Signature scheme | axlsign | Ed25519 (standard) |
+| Signature scheme (modern) | axlsign | Ed25519 (standard) |
+| Signature scheme (legacy) | axlsign | axlsign (namespace `axlsign`) |
 | Key agreement | X25519 | X25519 |
-| Same key for signing + ECDH | yes | no |
-| `opt_random` in signing APIs | yes | no |
+| Same key for signing + ECDH | yes | only in `axlsign` namespace |
+| `opt_random` in signing APIs | yes | yes in `axlsign`, no in top-level/`ed25519` |
 | OpenSSL backend | no | yes |
 
 Important:
 
 - X25519 public keys and Ed25519 public keys are different.
 - `node:crypto` does not expose an API to convert X25519 public keys to/from Ed25519 public keys.
-- `sign` and `signMessage` keep a 3rd optional argument only for call-shape compatibility, but they throw if provided (`opt_random` is unsupported).
+- Top-level `sign`/`signMessage` and `ed25519` keep Ed25519 semantics and reject `opt_random`.
+- For `curve25519-js` compatibility (including `opt_random`), use namespace `axlsign`.
 - Ed25519 signatures here are deterministic (OpenSSL default behavior).
 
 ---
@@ -120,6 +144,8 @@ This package targets modern Node using OpenSSL primitives:
 - better performance on Node >= 20
 - smaller, explicit API surface
 - strong typing with zero runtime dependencies
+
+In addition, the WASM `axlsign` namespace enables progressive migration of legacy code without reintroducing manual curve arithmetic in JavaScript.
 
 ---
 
@@ -249,6 +275,23 @@ Notes:
 - `cached` better isolates cryptographic throughput by reusing `KeyObject` on the modern side.
 - `raw` / `copy` / `nocopy` are closer to end-to-end API cost.
 - `sign`/`verify` comparisons measure API throughput, not cryptographic equivalence (`axlsign` vs standard Ed25519).
+
+---
+
+## Building `axlsign`
+
+In the npm package, WASM artifacts are already prebuilt under `dist/`.
+
+To build from source, you need:
+
+- Rust toolchain
+- `wasm-pack` installed
+
+Then `npm run build` runs:
+
+1. `wasm-pack build` (`wasm/axlsign`)
+2. TypeScript ESM + CJS build
+3. copy of WASM artifacts to `dist/internal/axlsign-wasm`
 
 ---
 

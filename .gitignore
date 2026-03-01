@@ -1,3 +1,6 @@
+/wasm/axlsign/target
+/wasm/axlsign/Cargo.lock
+
 # Logs
 logs
 *.log

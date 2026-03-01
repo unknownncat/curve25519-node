@@ -20,12 +20,14 @@ export function buildInputPool(count) {
   const msg32 = [];
   const msg256 = [];
   const msg1024 = [];
+  const rnd64 = [];
 
   for (let i = 0; i < vectorCount; i += 1) {
     seeds.push(deterministicBytes(`seed-${i}`, 32));
     msg32.push(deterministicBytes(`msg32-${i}`, 32));
     msg256.push(deterministicBytes(`msg256-${i}`, 256));
     msg1024.push(deterministicBytes(`msg1024-${i}`, 1024));
+    rnd64.push(deterministicBytes(`rnd64-${i}`, 64));
   }
 
   return {
@@ -34,6 +36,7 @@ export function buildInputPool(count) {
     msg32,
     msg256,
     msg1024,
+    rnd64,
   };
 }
 

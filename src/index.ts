@@ -1,4 +1,5 @@
 import { assertNoOptRandom, assertUint8Array } from "./internal/assert.js";
+import * as axlsignApi from "./axlsign.js";
 import * as ed25519Api from "./ed25519.js";
 import * as x25519Api from "./x25519.js";
 import type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
@@ -25,6 +26,19 @@ export const ed25519 = {
   verify: ed25519Api.verify,
   signMessage: ed25519Api.signMessage,
   openMessage: ed25519Api.openMessage,
+} as const;
+
+/**
+ * Optional legacy-compatible axlsign namespace implemented with WASM.
+ */
+export const axlsign = {
+  publicKey: axlsignApi.publicKey,
+  sharedKey: axlsignApi.sharedKey,
+  generateKeyPair: axlsignApi.generateKeyPair,
+  sign: axlsignApi.sign,
+  verify: axlsignApi.verify,
+  signMessage: axlsignApi.signMessage,
+  openMessage: axlsignApi.openMessage,
 } as const;
 
 /**
@@ -80,6 +94,7 @@ export const verify = ed25519.verify;
 const api = {
   x25519,
   ed25519,
+  axlsign,
   sharedKey,
   generateKeyPair,
   generateKeyPairX25519,

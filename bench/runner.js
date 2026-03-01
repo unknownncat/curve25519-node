@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import legacyCurve from "curve25519-js";
-import { asBytes32, asBytes64, ed25519, x25519 } from "@unknownncat/curve25519-node";
+import { asBytes32, asBytes64, axlsign, ed25519, x25519 } from "@unknownncat/curve25519-node";
 
 import { parseArgs, modeSummary } from "./config.js";
 import { buildInputPool, copyU8, maybeCopyU8, createCycler } from "./pool.js";
@@ -44,6 +44,7 @@ const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 const SIGN_NOTE = "sign/verify comparisons measure API throughput, not cryptographic equivalence";
 const OPENMSG_NOTE =
   "legacy openMessage mutates signed input; safe-copy mode is used to avoid invalid benchmarks";
+const AXL_NOTE = "axlsign comparisons are cryptographic-equivalence comparisons (same scheme)";
 
 function debugLog(config, message) {
   if (!config.debug || config.quiet) return;
@@ -234,6 +235,7 @@ function printSuiteHeader(meta, config) {
     `modes: variants=${config.variants.join(",")}, strict=${config.strict}, debug=${config.debug}, verifyDuringBench=${config.verifyDuringBench}, verifyEvery=${config.verifyEvery}`
   );
   console.log(`note: ${SIGN_NOTE}.`);
+  console.log(`note: ${AXL_NOTE}.`);
 }
 
 function printPairReport(pairReport, config) {
@@ -1130,7 +1132,7 @@ export async function run(argv = process.argv.slice(2)) {
       gc: config.gc,
     },
     modes: modeSummary(config),
-    notes: [SIGN_NOTE, OPENMSG_NOTE],
+    notes: [SIGN_NOTE, AXL_NOTE, OPENMSG_NOTE],
   };
 
   printSuiteHeader(meta, config);

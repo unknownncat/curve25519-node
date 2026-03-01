@@ -6,6 +6,8 @@
     "curve25519",
     "x25519",
     "ed25519",
+    "axlsign",
+    "wasm",
     "crypto",
     "cryptography",
     "openssl",
@@ -45,6 +47,12 @@
       "require": "./dist/cjs/ed25519.js",
       "default": "./dist/ed25519.js"
     },
+    "./axlsign": {
+      "types": "./dist/axlsign.d.ts",
+      "import": "./dist/axlsign.js",
+      "require": "./dist/cjs/axlsign.js",
+      "default": "./dist/axlsign.js"
+    },
     "./types": {
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js",
@@ -63,9 +71,11 @@
   },
   "scripts": {
     "clean": "node scripts/clean.mjs",
+    "build:wasm": "node scripts/build-axlsign-wasm.mjs",
     "build:esm": "tsc -p tsconfig.json",
     "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/write-cjs-package-json.mjs",
-    "build": "npm run clean && npm run build:esm && npm run build:cjs",
+    "build:copy-wasm": "node scripts/copy-axlsign-wasm.mjs",
+    "build": "npm run clean && npm run build:wasm && npm run build:esm && npm run build:cjs && npm run build:copy-wasm",
     "test": "npm run build && node --test \"test/*.test.mjs\"",
     "bench": "npm run build && npm --prefix bench run bench",
     "bench:quick": "npm run build && npm --prefix bench run bench:quick",
