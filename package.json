@@ -21,6 +21,8 @@
     "ci": "npm run lint && npm run typecheck && npm run test && npm run test:cross && npm run bench:ci",
     "release:check:nobench": "npm run ci:nobench && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-node && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-browser",
     "release:check": "npm run ci && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-node && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-browser",
+    "size:pack": "node scripts/pack-size.mjs",
+    "size:pack:json": "node scripts/pack-size.mjs --json",
     "release:patch": "node scripts/release.mjs --bump patch",
     "release:minor": "node scripts/release.mjs --bump minor",
     "release:major": "node scripts/release.mjs --bump major",

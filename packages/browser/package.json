@@ -58,6 +58,11 @@
   "files": [
     "dist/**/*",
     "README.md",
+    "README.en.md",
+    "NOTICE.md",
+    "THIRD_PARTY_NOTICE.md",
+    "THIRD_PARTY_NOTICES.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "engines": {
