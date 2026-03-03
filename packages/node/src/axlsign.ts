@@ -8,6 +8,15 @@ import {
 import * as rustAxlsign from "./internal/axlsign-wasm/axlsign_wasm.js";
 import type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
 
+interface RustAxlsignBindings {
+  axlsignPublicKey(secret_key: Uint8Array): Uint8Array;
+  axlsignSharedKey(secret_key: Uint8Array, public_key: Uint8Array): Uint8Array;
+  axlsignSign(secret_key: Uint8Array, msg: Uint8Array): Uint8Array;
+  axlsignSignRnd(secret_key: Uint8Array, msg: Uint8Array, rnd: Uint8Array): Uint8Array;
+  axlsignVerify(public_key: Uint8Array, msg: Uint8Array, signature: Uint8Array): boolean;
+}
+const rustBindings = rustAxlsign as unknown as RustAxlsignBindings;
+
 function clampScalar(seed32: Bytes32): Bytes32 {
   const out = new Uint8Array(32);
   out.set(seed32);
@@ -27,7 +36,7 @@ function assertOptionalRandom64(value: Uint8Array | undefined, fnName: string): 
  */
 export function publicKey(secretKey32: Bytes32): Bytes32 {
   assertBytes32(secretKey32, "secretKey32");
-  const out = rustAxlsign.axlsignPublicKey(secretKey32);
+  const out = rustBindings.axlsignPublicKey(secretKey32);
   return asBytes32(out, "axlsign public key");
 }
 
@@ -37,7 +46,7 @@ export function publicKey(secretKey32: Bytes32): Bytes32 {
 export function sharedKey(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32 {
   assertBytes32(secretKey32, "secretKey32");
   assertBytes32(publicKey32, "publicKey32");
-  const out = rustAxlsign.axlsignSharedKey(secretKey32, publicKey32);
+  const out = rustBindings.axlsignSharedKey(secretKey32, publicKey32);
   return asBytes32(out, "axlsign shared key");
 }
 
@@ -65,8 +74,8 @@ export function sign(secretKey32: Bytes32, msg: Uint8Array, opt_random?: Uint8Ar
 
   const signature =
     opt_random === undefined
-      ? rustAxlsign.axlsignSign(secretKey32, msg)
-      : rustAxlsign.axlsignSignRnd(secretKey32, msg, opt_random);
+      ? rustBindings.axlsignSign(secretKey32, msg)
+      : rustBindings.axlsignSignRnd(secretKey32, msg, opt_random);
   return asBytes64(signature, "axlsign signature");
 }
 
@@ -77,7 +86,7 @@ export function verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes
   assertBytes32(publicKey32, "publicKey32");
   assertUint8Array(msg, "msg");
   assertBytes64(signature64, "signature64");
-  return rustAxlsign.axlsignVerify(publicKey32, msg, signature64);
+  return rustBindings.axlsignVerify(publicKey32, msg, signature64);
 }
 
 /**

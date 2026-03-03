@@ -84,7 +84,8 @@ function Write-PackageJson {
     [object]$Data
   )
 
-  $json = $Data | ConvertTo-Json -Depth 100
+  # ConvertTo-Json emits CRLF on Windows; normalize to LF so Prettier checks stay stable.
+  $json = ($Data | ConvertTo-Json -Depth 100).Replace("`r`n", "`n")
   $fullPath = [System.IO.Path]::GetFullPath($Path)
   $encoding = New-Object System.Text.UTF8Encoding($false)
   [System.IO.File]::WriteAllText($fullPath, "$json`n", $encoding)
@@ -144,6 +145,7 @@ if ($Bump -ne "none") {
   }
 
   Invoke-CheckedCommand -File "npm" -Arguments @("install", "--package-lock-only")
+  Invoke-CheckedCommand -File "npm" -Arguments (@("exec", "--", "prettier", "--write") + $packageFiles)
 }
 
 if (-not $SkipChecks) {
