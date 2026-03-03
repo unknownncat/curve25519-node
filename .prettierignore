@@ -3,8 +3,6 @@ dist/
 **/dist/**
 packages/**/src/internal/axlsign-wasm/**
 packages/**/src/internal/curve25519-wasm/**
-packages/**/src/internal/napi/**
-packages/node/src/internal/curve25519-legacy.ts
 node_modules/
 bench/node_modules/
 bench/results/

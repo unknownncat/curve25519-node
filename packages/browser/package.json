@@ -1,6 +1,6 @@
 {
   "name": "@unknownncat/curve25519-browser",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "WASM-first X25519 + Ed25519 + axlsign for browsers",
   "keywords": [
     "curve25519",

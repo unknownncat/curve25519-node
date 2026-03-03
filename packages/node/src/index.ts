@@ -41,7 +41,7 @@ export const ed25519 = {
 } as const;
 
 /**
- * Legacy-compatible axlsign namespace implemented in Node runtime.
+ * Legacy-compatible axlsign namespace, accelerated by internal Rust/WASM bindings.
  */
 export const axlsign = {
   publicKey: axlsignApi.publicKey,

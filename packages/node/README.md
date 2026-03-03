@@ -5,7 +5,7 @@
 Implementacao para Node.js com API limpa:
 
 - `x25519` e `ed25519` via `node:crypto` (OpenSSL)
-- `axlsign` de compatibilidade legado em runtime Node
+- `axlsign` compativel com legado, acelerado por backend Rust/WASM interno
 - sem namespace `wasm`
 - sem namespace `napi`
 

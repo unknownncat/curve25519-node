@@ -5,7 +5,7 @@
 Node.js implementation with a clean API:
 
 - `x25519` and `ed25519` via `node:crypto` (OpenSSL)
-- legacy-compatible `axlsign` in Node runtime
+- legacy-compatible `axlsign` accelerated by an internal Rust/WASM backend
 - no `wasm` namespace
 - no `napi` namespace
 

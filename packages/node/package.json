@@ -1,7 +1,7 @@
 {
   "name": "@unknownncat/curve25519-node",
-  "version": "2.1.1",
-  "description": "Node.js X25519 + Ed25519 via node:crypto with axlsign compatibility in pure Node runtime",
+  "version": "2.1.2",
+  "description": "Node.js X25519 + Ed25519 via node:crypto with Rust-accelerated axlsign compatibility",
   "keywords": [
     "curve25519",
     "x25519",
@@ -75,10 +75,12 @@
   },
   "scripts": {
     "clean": "node scripts/clean.mjs",
+    "build:axlsign-rust": "node scripts/build-axlsign-rust.mjs",
     "build:esm": "tsc -p tsconfig.json",
     "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/write-cjs-package-json.mjs",
-    "build": "npm run clean && npm run build:esm && npm run build:cjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:copy-wasm": "node scripts/copy-axlsign-wasm.mjs",
+    "build": "npm run clean && npm run build:axlsign-rust && npm run build:esm && npm run build:cjs && npm run build:copy-wasm",
+    "typecheck": "npm run build:axlsign-rust && tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",

@@ -15,8 +15,6 @@ export default tseslint.config(
       "bench/**",
       "coverage/**",
       "src/internal/axlsign-wasm/**",
-      "src/internal/curve25519-wasm/**",
-      "src/internal/curve25519-legacy.ts",
     ],
   },
   {
