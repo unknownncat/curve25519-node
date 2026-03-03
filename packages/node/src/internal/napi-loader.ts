@@ -107,9 +107,7 @@ function loadNapiBindings(): NapiBindings {
     loaded = nodeRequire(napiModulePath);
   } catch (error) {
     const reason =
-      error instanceof Error
-        ? error
-        : new Error(`Unknown N-API load failure: ${String(error)}`);
+      error instanceof Error ? error : new Error(`Unknown N-API load failure: ${String(error)}`);
     throw reason;
   }
 

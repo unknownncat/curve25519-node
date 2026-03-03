@@ -40,8 +40,14 @@ test("napi.x25519 matches RFC 7748 vector and node:crypto output", () => {
   const napiPublic = napi.x25519.publicKey(alicePrivate);
   const napiShared = napi.x25519.sharedKey(alicePrivate, bobPublic);
 
-  assert.equal(bytesToHex(napiPublic), "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a");
-  assert.equal(bytesToHex(napiShared), "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742");
+  assert.equal(
+    bytesToHex(napiPublic),
+    "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a",
+  );
+  assert.equal(
+    bytesToHex(napiShared),
+    "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742",
+  );
   assert.equal(bytesToHex(napiPublic), bytesToHex(x25519.publicKey(alicePrivate)));
   assert.equal(bytesToHex(napiShared), bytesToHex(x25519.sharedKey(alicePrivate, bobPublic)));
 });

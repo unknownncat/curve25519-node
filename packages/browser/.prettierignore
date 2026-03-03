@@ -1,0 +1,4 @@
+dist/
+node_modules/
+src/internal/axlsign-wasm/
+src/internal/curve25519-wasm/

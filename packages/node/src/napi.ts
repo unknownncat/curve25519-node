@@ -1,4 +1,10 @@
-import { asBytes32, asBytes64, assertBytes32, assertBytes64, assertUint8Array } from "./internal/assert.js";
+import {
+  asBytes32,
+  asBytes64,
+  assertBytes32,
+  assertBytes64,
+  assertUint8Array,
+} from "./internal/assert.js";
 import { getNapiBindings, isNapiAvailable } from "./internal/napi-loader.js";
 import type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
 
@@ -242,7 +248,10 @@ export function axlsignPublicKey(secretKey32: Bytes32): Bytes32 {
 export function axlsignSharedKey(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32 {
   assertBytes32(secretKey32, "secretKey32");
   assertBytes32(publicKey32, "publicKey32");
-  return asBytes32(getNapiBindings().axlsignSharedKey(secretKey32, publicKey32), "axlsign shared key");
+  return asBytes32(
+    getNapiBindings().axlsignSharedKey(secretKey32, publicKey32),
+    "axlsign shared key",
+  );
 }
 
 export function axlsignGenerateKeyPair(seed32: Bytes32): KeyPair32 {
@@ -255,7 +264,11 @@ export function axlsignGenerateKeyPair(seed32: Bytes32): KeyPair32 {
   };
 }
 
-export function axlsignSign(secretKey32: Bytes32, msg: Uint8Array, opt_random?: Uint8Array): Bytes64 {
+export function axlsignSign(
+  secretKey32: Bytes32,
+  msg: Uint8Array,
+  opt_random?: Uint8Array,
+): Bytes64 {
   assertBytes32(secretKey32, "secretKey32");
   assertUint8Array(msg, "msg");
   assertOptionalRandom64(opt_random, "axlsignSign");
@@ -267,7 +280,11 @@ export function axlsignSign(secretKey32: Bytes32, msg: Uint8Array, opt_random?: 
   return asBytes64(signature, "axlsign signature");
 }
 
-export function axlsignVerify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes64): boolean {
+export function axlsignVerify(
+  publicKey32: Bytes32,
+  msg: Uint8Array,
+  signature64: Bytes64,
+): boolean {
   assertBytes32(publicKey32, "publicKey32");
   assertUint8Array(msg, "msg");
   assertBytes64(signature64, "signature64");

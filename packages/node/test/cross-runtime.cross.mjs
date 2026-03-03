@@ -5,7 +5,12 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import * as browser from "../../browser/dist/index.js";
-import { asBytes32, axlsign as nodeAxlsign, ed25519 as nodeEd25519, x25519 as nodeX25519 } from "../dist/index.js";
+import {
+  asBytes32,
+  axlsign as nodeAxlsign,
+  ed25519 as nodeEd25519,
+  x25519 as nodeX25519,
+} from "../dist/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const hexToBytes = (hex) => new Uint8Array(Buffer.from(hex, "hex"));

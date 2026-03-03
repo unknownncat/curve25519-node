@@ -95,7 +95,11 @@ if (napi.isAvailable()) {
   const seed = asBytes32(new Uint8Array(32));
   const kp = napi.x25519.generateKeyPair(seed);
   const sig = napi.ed25519.sign(seed, new TextEncoder().encode("hello"));
-  const ok = napi.ed25519.verify(napi.ed25519.publicKey(seed), new TextEncoder().encode("hello"), sig);
+  const ok = napi.ed25519.verify(
+    napi.ed25519.publicKey(seed),
+    new TextEncoder().encode("hello"),
+    sig,
+  );
 }
 ```
 

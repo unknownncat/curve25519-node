@@ -68,7 +68,9 @@ if (!runtime.isWasmInitialized()) {
 });
 
 await initWasm({
-  axlsign: await readFile(join(here, "..", "dist", "internal", "axlsign-wasm", "axlsign_wasm_bg.wasm")),
+  axlsign: await readFile(
+    join(here, "..", "dist", "internal", "axlsign-wasm", "axlsign_wasm_bg.wasm"),
+  ),
   curve25519: await readFile(
     join(here, "..", "dist", "internal", "curve25519-wasm", "curve25519_wasm_bg.wasm"),
   ),
@@ -105,7 +107,10 @@ test("browser ed25519 signs/verifies RFC 8032 vector", () => {
   const publicKey32 = ed25519.publicKey(seed);
   const signature64 = ed25519.sign(seed, msg);
 
-  assert.equal(bytesToHex(publicKey32), "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
+  assert.equal(
+    bytesToHex(publicKey32),
+    "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+  );
   assert.equal(
     bytesToHex(signature64),
     "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155" +
