@@ -17,7 +17,6 @@ Este subprojeto e privado (`private: true`) e nao deve ser publicado no npm.
 - saida humana + JSON (`--json` / `--jsonFile=...`)
 - modo estrito (`--strict`) para falhar em inconsistencias
 - suporte a baseline para detectar regressao
-- pares extras NAPI (Rust addon) quando o `.node` nativo estiver disponivel
 
 ## Importante sobre assinaturas
 
@@ -48,6 +47,7 @@ Na raiz:
 ```bash
 npm install
 npm run build:node
+npm run build:browser
 ```
 
 Publicacao npm deve ser feita na raiz do projeto principal, nao dentro de `bench/`.
@@ -63,12 +63,6 @@ npm run -w curve25519-node-bench bench:ci
 ```
 
 Se voce preferir entrar em `bench/`, os mesmos scripts funcionam com `npm run bench:*`.
-
-## NAPI (Rust addon)
-
-- quando `@unknownncat/curve25519-node` tiver o addon N-API carregavel, o bench inclui pares `napi.*`
-- quando nao estiver disponivel, o bench continua e marca warning: `napi addon unavailable; skipping napi benchmark pairs`
-- os pares `napi.*` comparam o backend Rust nativo contra o backend Node/OpenSSL (mesmo esquema)
 
 ## Flags CLI
 

@@ -8,18 +8,17 @@
     "bench"
   ],
   "scripts": {
-    "build": "npm run build:core && npm run build:node && npm run build:browser",
-    "build:core": "npm run -w @unknownncat/curve25519-core build",
+    "build": "npm run build:node && npm run build:browser",
     "build:node": "npm run -w @unknownncat/curve25519-node build",
     "build:browser": "npm run -w @unknownncat/curve25519-browser build",
     "clean": "npm run --workspaces --if-present clean && node -e \"require('node:fs').rmSync('dist',{ recursive:true, force:true })\"",
     "lint": "npm run --workspaces --if-present lint",
-    "typecheck": "npm run -w @unknownncat/curve25519-core typecheck && npm run -w @unknownncat/curve25519-node typecheck && npm run -w @unknownncat/curve25519-browser typecheck",
-    "test": "npm run -w @unknownncat/curve25519-core test && npm run -w @unknownncat/curve25519-node test && npm run -w @unknownncat/curve25519-browser test",
+    "typecheck": "npm run -w @unknownncat/curve25519-node typecheck && npm run -w @unknownncat/curve25519-browser typecheck",
+    "test": "npm run -w @unknownncat/curve25519-node test && npm run -w @unknownncat/curve25519-browser test",
     "test:cross": "npm run -w @unknownncat/curve25519-node test:cross",
     "bench:ci": "npm run -w curve25519-node-bench bench:ci",
     "ci": "npm run lint && npm run typecheck && npm run test && npm run test:cross && npm run bench:ci",
-    "release:check": "npm run ci && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-core && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-node && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-browser",
+    "release:check": "npm run ci && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-node && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-browser",
     "release:patch": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump patch",
     "release:minor": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump minor",
     "release:major": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump major",
@@ -27,5 +26,16 @@
     "release:patch:publish": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump patch -Publish -Commit -Tag",
     "release:minor:publish": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump minor -Publish -Commit -Tag",
     "release:major:publish": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump major -Publish -Commit -Tag"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "@types/node": "^22.18.6",
+    "curve25519-js": "^0.0.4",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.46.1"
   }
 }

@@ -1,8 +1,7 @@
 [workspace]
 members = [
   "crates/axlsign-wasm",
-  "crates/curve-wasm",
-  "crates/curve-napi"
+  "crates/curve-wasm"
 ]
 resolver = "2"
 

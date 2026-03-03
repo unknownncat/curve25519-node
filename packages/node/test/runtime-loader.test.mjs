@@ -9,7 +9,7 @@ function runNode(args, code) {
   });
 }
 
-test("CJS eval can use axlsign + wasm + napi namespaces", () => {
+test("CJS eval can use axlsign namespace without wasm/napi namespaces", () => {
   const code =
     "const m=require('./dist/cjs/index.js');" +
     "const seed=new Uint8Array(32);seed[0]=7;" +
@@ -17,12 +17,11 @@ test("CJS eval can use axlsign + wasm + napi namespaces", () => {
     "const ax=m.axlsign.generateKeyPair(seed);" +
     "const sig=m.axlsign.sign(ax.private,msg);" +
     "if(!m.axlsign.verify(ax.public,msg,sig))throw new Error('axlsign verify failed');" +
-    "const wk=m.wasm.x25519.generateKeyPair(seed);" +
-    "const shared=m.wasm.x25519.sharedKey(wk.private,wk.public);" +
-    "if(shared.length!==32)throw new Error('wasm shared key size');" +
-    "if(!m.napi.isAvailable())throw new Error('napi unavailable');" +
-    "const nk=m.napi.x25519.generateKeyPair(seed);" +
-    "if(nk.public.length!==32)throw new Error('napi key size');";
+    "const wk=m.x25519.generateKeyPair(seed);" +
+    "const shared=m.x25519.sharedKey(wk.private,wk.public);" +
+    "if(shared.length!==32)throw new Error('x25519 shared key size');" +
+    "if('wasm' in m)throw new Error('unexpected wasm namespace');" +
+    "if('napi' in m)throw new Error('unexpected napi namespace');";
 
   const result = runNode(["-e"], code);
   assert.equal(
@@ -32,7 +31,7 @@ test("CJS eval can use axlsign + wasm + napi namespaces", () => {
   );
 });
 
-test("ESM eval can use axlsign + wasm + napi namespaces", () => {
+test("ESM eval can use axlsign namespace without wasm/napi namespaces", () => {
   const code =
     "import('./dist/index.js').then((m)=>{" +
     "const seed=new Uint8Array(32);seed[0]=9;" +
@@ -40,12 +39,11 @@ test("ESM eval can use axlsign + wasm + napi namespaces", () => {
     "const ax=m.axlsign.generateKeyPair(seed);" +
     "const sig=m.axlsign.sign(ax.private,msg);" +
     "if(!m.axlsign.verify(ax.public,msg,sig))throw new Error('axlsign verify failed');" +
-    "const wk=m.wasm.x25519.generateKeyPair(seed);" +
-    "const shared=m.wasm.x25519.sharedKey(wk.private,wk.public);" +
-    "if(shared.length!==32)throw new Error('wasm shared key size');" +
-    "if(!m.napi.isAvailable())throw new Error('napi unavailable');" +
-    "const nk=m.napi.x25519.generateKeyPair(seed);" +
-    "if(nk.public.length!==32)throw new Error('napi key size');" +
+    "const wk=m.x25519.generateKeyPair(seed);" +
+    "const shared=m.x25519.sharedKey(wk.private,wk.public);" +
+    "if(shared.length!==32)throw new Error('x25519 shared key size');" +
+    "if('wasm' in m)throw new Error('unexpected wasm namespace');" +
+    "if('napi' in m)throw new Error('unexpected napi namespace');" +
     "}).catch((err)=>{console.error(err);process.exit(1);});";
 
   const result = runNode(["--input-type=module", "-e"], code);

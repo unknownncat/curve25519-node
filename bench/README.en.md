@@ -17,7 +17,6 @@ This subproject is private (`private: true`) and must not be published to npm.
 - human-readable output + JSON (`--json` / `--jsonFile=...`)
 - strict mode (`--strict`) to fail on inconsistencies
 - baseline support for regression detection
-- extra NAPI (Rust addon) pairs when the native `.node` addon is available
 
 ## Important note on signatures
 
@@ -48,6 +47,7 @@ From repository root:
 ```bash
 npm install
 npm run build:node
+npm run build:browser
 ```
 
 Publish to npm from repository root package, not from `bench/`.
@@ -63,12 +63,6 @@ npm run -w curve25519-node-bench bench:ci
 ```
 
 If you prefer entering `bench/`, the same scripts also work with `npm run bench:*`.
-
-## NAPI (Rust addon)
-
-- when `@unknownncat/curve25519-node` can load its N-API addon, the bench includes `napi.*` pairs
-- when it is unavailable, the bench still runs and records warning: `napi addon unavailable; skipping napi benchmark pairs`
-- `napi.*` pairs compare native Rust backend vs Node/OpenSSL backend (same scheme)
 
 ## CLI flags
 

@@ -95,18 +95,14 @@ $repoRoot = (Resolve-Path (Join-Path $scriptDir "..")).Path
 Set-Location $repoRoot
 
 $packageFiles = @(
-  "packages/core/package.json",
   "packages/node/package.json",
   "packages/browser/package.json"
 )
 
 $publishOrder = @(
-  "@unknownncat/curve25519-core",
   "@unknownncat/curve25519-node",
   "@unknownncat/curve25519-browser"
 )
-
-$corePackageName = "@unknownncat/curve25519-core"
 
 if (-not $AllowDirty) {
   $statusOutput = git status --porcelain
@@ -140,12 +136,6 @@ Write-Host "Target version:  $nextVersion"
 if ($Bump -ne "none") {
   foreach ($entry in $packages) {
     $entry.Json.version = $nextVersion
-
-    if ($entry.Json.PSObject.Properties.Name -contains "dependencies") {
-      if ($entry.Json.dependencies.PSObject.Properties.Name -contains $corePackageName) {
-        $entry.Json.dependencies.$corePackageName = $nextVersion
-      }
-    }
   }
 
   foreach ($entry in $packages) {

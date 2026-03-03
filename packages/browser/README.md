@@ -33,5 +33,4 @@ await initWasm({
 - `x25519` (WASM modern API)
 - `ed25519` (WASM modern API)
 - `axlsign` (legacy compatibility via WASM)
-- `wasm` (namespace alias for modern WASM API)
 - top-level aliases (`sharedKey`, `sign`, `verify`, etc.)

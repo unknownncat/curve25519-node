@@ -23,11 +23,6 @@ export const axlsign = {
   openMessage: axlsignApi.openMessage,
 } as const;
 
-export const wasm = {
-  x25519: wasmApi.x25519,
-  ed25519: wasmApi.ed25519,
-} as const;
-
 export const sharedKey = x25519.sharedKey;
 export const sharedKeyStrict = x25519.sharedKeyStrict;
 export const generateKeyPair = x25519.generateKeyPair;
@@ -59,7 +54,6 @@ const api = {
   x25519,
   ed25519,
   axlsign,
-  wasm,
   sharedKey,
   sharedKeyStrict,
   generateKeyPair,

@@ -16,7 +16,7 @@ export default tseslint.config(
       "coverage/**",
       "src/internal/axlsign-wasm/**",
       "src/internal/curve25519-wasm/**",
-      "src/internal/napi/**",
+      "src/internal/curve25519-legacy.ts",
     ],
   },
   {

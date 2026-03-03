@@ -1,8 +1,23 @@
 import crypto from "node:crypto";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import legacyCurve from "curve25519-js";
-import { asBytes32, axlsign } from "@unknownncat/curve25519-node";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const rootDir = join(__dirname, "..");
+const nodeDistEntry = join(rootDir, "packages", "node", "dist", "index.js");
+
+if (!existsSync(nodeDistEntry)) {
+  throw new Error(
+    "packages/node/dist/ nao encontrado. Rode `npm run build:node` (ou `npm run build`) na raiz antes do compat check."
+  );
+}
+
+const { asBytes32, axlsign } = await import(pathToFileURL(nodeDistEntry).href);
 
 const ALICE_PRIV = "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a";
 const BOB_PUB = "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f";

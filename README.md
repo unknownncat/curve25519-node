@@ -6,13 +6,11 @@ Homepage: <https://github.com/unknownncat/curve25519-node>
 
 ## Projetos deste monorepo
 
-- `@unknownncat/curve25519-core`  
-  [`packages/core/README.md`](./packages/core/README.md)
 - `@unknownncat/curve25519-node`  
   [`packages/node/README.md`](./packages/node/README.md)
 - `@unknownncat/curve25519-browser`  
   [`packages/browser/README.md`](./packages/browser/README.md)
-- Rust workspace (WASM + N-API)  
+- Rust workspace (WASM)  
   [`rust/README.md`](./rust/README.md)
 - Benchmarks  
   [`bench/README.md`](./bench/README.md)

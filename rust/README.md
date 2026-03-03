@@ -10,16 +10,12 @@ Este diretório contém o workspace Rust usado pelos pacotes Node e Browser.
   Compatibilidade legada com `curve25519-js` (esquema axlsign).
 - `rust/crates/curve-wasm`  
   Implementação WASM da API moderna (`x25519` + `ed25519`).
-- `rust/crates/curve-napi`  
-  Addon nativo Node.js via `napi-rs` com foco em throughput.
 
 ## Artefatos gerados
 
-- `packages/node/src/internal/*-wasm` (target `nodejs`)
-- `packages/node/src/internal/napi/curve25519_node_napi.node`
 - `packages/browser/src/internal/*-wasm` (target `web`)
 
-Depois esses arquivos são copiados para `dist/internal/*-wasm` em cada pacote.
+Depois esses arquivos são copiados para `dist/internal/*-wasm` do pacote browser.
 
 ## Pré-requisitos
 
@@ -37,6 +33,5 @@ cargo install wasm-pack
 Na raiz do monorepo:
 
 ```bash
-npm run build:node
 npm run build:browser
 ```

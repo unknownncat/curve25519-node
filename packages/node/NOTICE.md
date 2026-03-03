@@ -21,11 +21,10 @@ Repository: <https://github.com/unknownncat/curve25519-node>
 
 ## Rust dependency notices
 
-The project contains Rust crates for WASM and native N-API:
+The project contains Rust crates for WASM:
 
 - `rust/crates/curve-wasm`
 - `rust/crates/axlsign-wasm`
-- `rust/crates/curve-napi`
 
 License inventory was collected with:
 
@@ -82,7 +81,6 @@ cargo license -t
 | ----------------------- | ------- |
 | curve25519-node-wasm    | MIT     |
 | curve25519-node-axlsign | MIT     |
-| curve25519-node-napi    | MIT     |
 
 ## Notes
 

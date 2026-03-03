@@ -1,6 +1,3 @@
-import { existsSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
-import { createRequire } from "node:module";
 import {
   asBytes32,
   asBytes64,
@@ -8,67 +5,23 @@ import {
   assertBytes64,
   assertUint8Array,
 } from "./internal/assert.js";
+import * as legacyAxlsign from "./internal/curve25519-legacy.js";
 import type { Bytes32, Bytes64, KeyPair32 } from "./types.js";
-import type * as WasmAxlModule from "./internal/axlsign-wasm/axlsign_wasm.js";
 
-const SELF_PACKAGE_NAME = "@unknownncat/curve25519-node";
-
-const requireBase =
-  typeof __filename === "string"
-    ? __filename
-    : typeof process.argv[1] === "string" && isAbsolute(process.argv[1])
-      ? process.argv[1]
-      : join(process.cwd(), "package.json");
-
-const nodeRequire = createRequire(requireBase);
-
-let wasmModulePath: string | undefined;
-
-let wasmAxl: typeof WasmAxlModule | undefined;
-
-function resolveWasmModulePath(): string {
-  const candidates: string[] = [];
-
-  try {
-    const packageJsonPath = nodeRequire.resolve(`${SELF_PACKAGE_NAME}/package.json`);
-    candidates.push(
-      join(dirname(packageJsonPath), "dist", "internal", "axlsign-wasm", "axlsign_wasm.js"),
-    );
-  } catch {
-    // Fall back to local development paths below.
-  }
-
-  if (typeof __dirname === "string") {
-    candidates.push(join(__dirname, "internal", "axlsign-wasm", "axlsign_wasm.js"));
-  }
-
-  candidates.push(join(process.cwd(), "dist", "internal", "axlsign-wasm", "axlsign_wasm.js"));
-  candidates.push(join(process.cwd(), "src", "internal", "axlsign-wasm", "axlsign_wasm.js"));
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  throw new Error(
-    "Unable to locate axlsign WASM module. Run `npm run build` before using axlsign in local dev.",
-  );
+interface LegacyCurve25519KeyPair {
+  public: Uint8Array;
+  private: Uint8Array;
 }
 
-function getWasmAxl(): typeof WasmAxlModule {
-  if (wasmAxl !== undefined) {
-    return wasmAxl;
-  }
-
-  if (wasmModulePath === undefined) {
-    wasmModulePath = resolveWasmModulePath();
-  }
-
-  // Lazy-load WASM bindings to keep modern-only imports lightweight.
-  wasmAxl = nodeRequire(wasmModulePath) as typeof WasmAxlModule;
-  return wasmAxl;
+interface LegacyCurve25519 {
+  generateKeyPair(secret: Uint8Array): LegacyCurve25519KeyPair;
+  sharedKey(secret: Uint8Array, publicKey: Uint8Array): Uint8Array;
+  sign(secret: Uint8Array, msg: Uint8Array, optRandom?: Uint8Array): Uint8Array;
+  verify(publicKey: Uint8Array, msg: Uint8Array, signature: Uint8Array): boolean;
+  signMessage(secret: Uint8Array, msg: Uint8Array, optRandom?: Uint8Array): Uint8Array;
+  openMessage(publicKey: Uint8Array, signedMsg: Uint8Array): Uint8Array | null;
 }
+const legacy = legacyAxlsign as LegacyCurve25519;
 
 function clampScalar(seed32: Bytes32): Bytes32 {
   const out = new Uint8Array(32);
@@ -85,11 +38,11 @@ function assertOptionalRandom64(value: Uint8Array | undefined, fnName: string): 
 }
 
 /**
- * Derives an axlsign-compatible public key (Montgomery/X25519 format).
+ * Derives an axlsign-compatible public key (Montgomery/X25519 format) in Node runtime.
  */
 export function publicKey(secretKey32: Bytes32): Bytes32 {
   assertBytes32(secretKey32, "secretKey32");
-  const out = getWasmAxl().axlsignPublicKey(secretKey32);
+  const out = legacy.generateKeyPair(secretKey32).public;
   return asBytes32(out, "axlsign public key");
 }
 
@@ -99,7 +52,7 @@ export function publicKey(secretKey32: Bytes32): Bytes32 {
 export function sharedKey(secretKey32: Bytes32, publicKey32: Bytes32): Bytes32 {
   assertBytes32(secretKey32, "secretKey32");
   assertBytes32(publicKey32, "publicKey32");
-  const out = getWasmAxl().axlsignSharedKey(secretKey32, publicKey32);
+  const out = legacy.sharedKey(secretKey32, publicKey32);
   return asBytes32(out, "axlsign shared key");
 }
 
@@ -127,8 +80,8 @@ export function sign(secretKey32: Bytes32, msg: Uint8Array, opt_random?: Uint8Ar
 
   const signature =
     opt_random === undefined
-      ? getWasmAxl().axlsignSign(secretKey32, msg)
-      : getWasmAxl().axlsignSignRnd(secretKey32, msg, opt_random);
+      ? legacy.sign(secretKey32, msg)
+      : legacy.sign(secretKey32, msg, opt_random);
   return asBytes64(signature, "axlsign signature");
 }
 
@@ -139,7 +92,7 @@ export function verify(publicKey32: Bytes32, msg: Uint8Array, signature64: Bytes
   assertBytes32(publicKey32, "publicKey32");
   assertUint8Array(msg, "msg");
   assertBytes64(signature64, "signature64");
-  return getWasmAxl().axlsignVerify(publicKey32, msg, signature64);
+  return legacy.verify(publicKey32, msg, signature64);
 }
 
 /**
@@ -172,11 +125,11 @@ export function openMessage(publicKey32: Bytes32, signedMsg: Uint8Array): Uint8A
     return null;
   }
 
-  const signature64 = asBytes64(signedMsg.subarray(0, 64), "signedMsg signature");
-  const msg = signedMsg.subarray(64);
-  if (!verify(publicKey32, msg, signature64)) {
+  // curve25519-js mutates input; keep API immutable by passing a defensive copy.
+  const opened = legacy.openMessage(publicKey32, new Uint8Array(signedMsg));
+  if (opened === null) {
     return null;
   }
-
-  return new Uint8Array(msg);
+  assertUint8Array(opened, "opened message");
+  return new Uint8Array(opened);
 }

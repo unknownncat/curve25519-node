@@ -35,15 +35,60 @@ if (!existsSync(rootDistEntry)) {
   );
 }
 
+const browserDistEntry = join(rootDir, "packages", "browser", "dist", "index.js");
+if (!existsSync(browserDistEntry)) {
+  throw new Error(
+    "packages/browser/dist/ nao encontrado. Rode `npm run build:browser` (ou `npm run build`) na raiz antes do benchmark."
+  );
+}
+
 const {
   asBytes32,
   asBytes64,
   axlsign,
   ed25519,
-  napi,
-  wasm,
   x25519,
 } = await import(pathToFileURL(rootDistEntry).href);
+const browser = await import(pathToFileURL(browserDistEntry).href);
+
+const axlsignWasmPath = join(
+  rootDir,
+  "packages",
+  "browser",
+  "dist",
+  "internal",
+  "axlsign-wasm",
+  "axlsign_wasm_bg.wasm"
+);
+const curveWasmPath = join(
+  rootDir,
+  "packages",
+  "browser",
+  "dist",
+  "internal",
+  "curve25519-wasm",
+  "curve25519_wasm_bg.wasm"
+);
+if (!existsSync(axlsignWasmPath) || !existsSync(curveWasmPath)) {
+  throw new Error(
+    "WASM artifacts do browser nao encontrados. Rode `npm run build:browser` na raiz antes do benchmark."
+  );
+}
+
+await browser.initWasm({
+  axlsign: readFileSync(axlsignWasmPath),
+  curve25519: readFileSync(curveWasmPath),
+});
+
+const wasm = {
+  x25519: browser.x25519,
+  ed25519: browser.ed25519,
+  axlsign: browser.axlsign,
+};
+
+const napi = {
+  isAvailable: () => false,
+};
 
 const X25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b656e04220420", "hex");
 const X25519_SPKI_PREFIX = Buffer.from("302a300506032b656e032100", "hex");
@@ -54,7 +99,6 @@ const SIGN_NOTE = "sign/verify comparisons measure API throughput, not cryptogra
 const OPENMSG_NOTE =
   "legacy openMessage mutates signed input; safe-copy mode is used to avoid invalid benchmarks";
 const AXL_NOTE = "axlsign comparisons are cryptographic-equivalence comparisons (same scheme)";
-const NAPI_NOTE = "napi comparisons are native Rust addon vs node:crypto runtime throughput";
 
 function debugLog(config, message) {
   if (!config.debug || config.quiet) return;
@@ -238,9 +282,7 @@ function printSuiteHeader(meta, config) {
   console.log(`node: ${meta.node}`);
   console.log(`openssl: ${meta.openssl}`);
   console.log(`cpu: ${meta.cpuModel} (logical cores: ${meta.logicalCores})`);
-  console.log(
-    `runtime: napi=${meta.modes.napiEnabled ? "available" : "unavailable (napi pairs skipped)"}`
-  );
+  console.log("runtime: node:crypto + browser wasm");
   console.log(
     `config: rounds=${config.rounds}, roundMs=${config.roundMs}, warmupMs=${config.warmupMs}, vectors=${config.vectors}, gc=${config.gc}`
   );
@@ -2825,9 +2867,6 @@ export async function run(argv = process.argv.slice(2)) {
   if (context.vectorCount < 64) {
     throw new Error(`vector pool must be >= 64, got ${context.vectorCount}`);
   }
-  if (!context.napiEnabled) {
-    issues.warnings.push("napi addon unavailable; skipping napi benchmark pairs");
-  }
 
   const meta = {
     timestamp: new Date().toISOString(),
@@ -2844,9 +2883,8 @@ export async function run(argv = process.argv.slice(2)) {
     },
     modes: {
       ...modeSummary(config),
-      napiEnabled: context.napiEnabled,
     },
-    notes: context.napiEnabled ? [SIGN_NOTE, AXL_NOTE, OPENMSG_NOTE, NAPI_NOTE] : [SIGN_NOTE, AXL_NOTE, OPENMSG_NOTE],
+    notes: [SIGN_NOTE, AXL_NOTE, OPENMSG_NOTE],
   };
 
   printSuiteHeader(meta, config);
