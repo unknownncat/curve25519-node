@@ -1,0 +1,21 @@
+[package]
+name = "curve25519-node-napi"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "High-performance napi-rs bindings for curve25519-node"
+repository = "https://github.com/unknownncat/curve25519-node"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2", default-features = false, features = ["napi8"] }
+napi-derive = "2"
+curve25519-dalek = { version = "4", default-features = false, features = ["alloc"] }
+x25519-dalek = { version = "2", default-features = false }
+ed25519-dalek = { version = "2", default-features = false }
+sha2 = "0.10"
+
+[build-dependencies]
+napi-build = "2"

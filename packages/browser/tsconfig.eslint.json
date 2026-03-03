@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "baseUrl": ".",
+    "paths": {
+      "@unknownncat/curve25519-core": ["../core/src/index.ts"],
+      "@unknownncat/curve25519-core/*": ["../core/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "../core/src/**/*.ts"]
+}

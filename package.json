@@ -1,115 +1,31 @@
 {
-  "name": "@unknownncat/curve25519-node",
-  "version": "2.1.1",
-  "description": "Modern zero-dependency X25519 + Ed25519 for Node.js using OpenSSL via node:crypto",
-  "keywords": [
-    "curve25519",
-    "x25519",
-    "ed25519",
-    "axlsign",
-    "wasm",
-    "crypto",
-    "cryptography",
-    "openssl",
-    "node"
+  "name": "unknownncat-curve25519-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Monorepo for curve25519 node/browser packages",
+  "workspaces": [
+    "packages/*",
+    "bench"
   ],
-  "homepage": "https://github.com/unknownncat/curve25519-node#readme",
-  "bugs": {
-    "url": "https://github.com/unknownncat/curve25519-node/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/unknownncat/curve25519-node.git"
-  },
-  "license": "MIT",
-  "author": "unknownncat",
-  "type": "module",
-  "sideEffects": false,
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/cjs/index.js",
-      "default": "./dist/index.js"
-    },
-    "./x25519": {
-      "types": "./dist/x25519.d.ts",
-      "import": "./dist/x25519.js",
-      "require": "./dist/cjs/x25519.js",
-      "default": "./dist/x25519.js"
-    },
-    "./ed25519": {
-      "types": "./dist/ed25519.d.ts",
-      "import": "./dist/ed25519.js",
-      "require": "./dist/cjs/ed25519.js",
-      "default": "./dist/ed25519.js"
-    },
-    "./axlsign": {
-      "types": "./dist/axlsign.d.ts",
-      "import": "./dist/axlsign.js",
-      "require": "./dist/cjs/axlsign.js",
-      "default": "./dist/axlsign.js"
-    },
-    "./wasm": {
-      "types": "./dist/wasm.d.ts",
-      "import": "./dist/wasm.js",
-      "require": "./dist/cjs/wasm.js",
-      "default": "./dist/wasm.js"
-    },
-    "./types": {
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js",
-      "require": "./dist/cjs/types.js",
-      "default": "./dist/types.js"
-    },
-    "./package.json": "./package.json"
-  },
-  "files": [
-    "dist/**/*",
-    "README.md",
-    "README.en.md",
-    "NOTICE.md",
-    "THIRD_PARTY_NOTICE.md",
-    "THIRD_PARTY_NOTICES.md",
-    "SECURITY.md",
-    "LICENSE"
-  ],
-  "engines": {
-    "node": ">=20"
-  },
   "scripts": {
-    "clean": "node scripts/clean.mjs",
-    "build:wasm": "node scripts/build-axlsign-wasm.mjs && node scripts/build-curve25519-wasm.mjs",
-    "build:esm": "tsc -p tsconfig.json",
-    "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/write-cjs-package-json.mjs",
-    "build:copy-wasm": "node scripts/copy-axlsign-wasm.mjs",
-    "build": "npm run clean && npm run build:wasm && npm run build:esm && npm run build:cjs && npm run build:copy-wasm",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier . --write",
-    "format:check": "prettier . --check",
-    "test": "npm run build && node --test \"test/*.test.mjs\"",
-    "audit": "npm audit",
-    "audit:prod": "npm audit --omit=dev",
-    "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test",
-    "release:check": "npm run ci && npm pack --dry-run --ignore-scripts",
-    "bench": "npm run build && npm --prefix bench run bench",
-    "bench:quick": "npm run build && npm --prefix bench run bench:quick",
-    "prepack": "npm run ci",
-    "prepublishOnly": "npm run ci"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.37.0",
-    "@types/node": "^22.18.6",
-    "eslint": "^9.37.0",
-    "eslint-config-prettier": "^10.1.8",
-    "globals": "^16.4.0",
-    "prettier": "^3.6.2",
-    "typescript-eslint": "^8.46.1",
-    "typescript": "^5.9.2"
+    "build": "npm run build:core && npm run build:node && npm run build:browser",
+    "build:core": "npm run -w @unknownncat/curve25519-core build",
+    "build:node": "npm run -w @unknownncat/curve25519-node build",
+    "build:browser": "npm run -w @unknownncat/curve25519-browser build",
+    "clean": "npm run --workspaces --if-present clean && node -e \"require('node:fs').rmSync('dist',{ recursive:true, force:true })\"",
+    "lint": "npm run --workspaces --if-present lint",
+    "typecheck": "npm run -w @unknownncat/curve25519-core typecheck && npm run -w @unknownncat/curve25519-node typecheck && npm run -w @unknownncat/curve25519-browser typecheck",
+    "test": "npm run -w @unknownncat/curve25519-core test && npm run -w @unknownncat/curve25519-node test && npm run -w @unknownncat/curve25519-browser test",
+    "test:cross": "npm run -w @unknownncat/curve25519-node test:cross",
+    "bench:ci": "npm run -w curve25519-node-bench bench:ci",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run test:cross && npm run bench:ci",
+    "release:check": "npm run ci && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-core && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-node && npm pack --dry-run --ignore-scripts -w @unknownncat/curve25519-browser",
+    "release:patch": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump patch",
+    "release:minor": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump minor",
+    "release:major": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump major",
+    "release:publish": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump none -Publish",
+    "release:patch:publish": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump patch -Publish -Commit -Tag",
+    "release:minor:publish": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump minor -Publish -Commit -Tag",
+    "release:major:publish": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump major -Publish -Commit -Tag"
   }
 }

@@ -3,9 +3,9 @@
   "private": true,
   "version": "1.0.1",
   "type": "module",
-  "description": "Benchmarks for @unknownncat/curve25519-node vs curve25519-js",
+  "description": "Benchmarks for @unknownncat/curve25519-node (node:crypto/wasm/napi) vs curve25519-js",
   "scripts": {
-    "compat:axlsign": "node axlsign-compat-check.mjs --iterations=512",
+    "compat:axlsign": "node axlsign-compat-check.mjs",
     "bench": "node --expose-gc bench.mjs --variants=raw",
     "bench:quick": "node --expose-gc bench.mjs --rounds=8 --roundMs=180 --warmupMs=200 --variants=raw",
     "bench:full": "node --expose-gc bench.mjs --rounds=16 --roundMs=350 --warmupMs=500 --variants=raw,cached,nocopy,copy --verifyDuringBench --verifyEvery=64",
@@ -15,7 +15,7 @@
     "prepublishOnly": "node -e \"console.error('bench/ is private and should not be published. Publish from repository root package instead.'); process.exit(1)\""
   },
   "dependencies": {
-    "@unknownncat/curve25519-node": "file:..",
+    "@unknownncat/curve25519-node": "file:../packages/node",
     "curve25519-js": "^0.0.4"
   },
   "engines": {

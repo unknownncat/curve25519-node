@@ -63,7 +63,7 @@ function runOriginalExampleComparison() {
   };
 }
 
-function runManyComparisons(iterations = 256) {
+function runManyComparisons(iterations = 512) {
   for (let i = 0; i < iterations; i += 1) {
     const seedA = Uint8Array.from(crypto.randomBytes(32));
     const seedB = Uint8Array.from(crypto.randomBytes(32));
@@ -94,7 +94,7 @@ function runManyComparisons(iterations = 256) {
 
 function parseIterations(argv) {
   const flag = argv.find((arg) => arg.startsWith("--iterations="));
-  if (!flag) return 256;
+  if (!flag) return 512;
   const raw = flag.slice("--iterations=".length);
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n < 1) {

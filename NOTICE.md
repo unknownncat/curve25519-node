@@ -19,12 +19,13 @@ Repository: <https://github.com/unknownncat/curve25519-node>
 - OpenSSL (used through Node.js `node:crypto`) — Apache-2.0  
   <https://www.openssl.org/>
 
-## Rust/WASM dependency notices
+## Rust dependency notices
 
-The project contains two Rust/WASM crates:
+The project contains Rust crates for WASM and native N-API:
 
-- `wasm/curve25519-wasm`
-- `wasm/axlsign`
+- `rust/crates/curve-wasm`
+- `rust/crates/axlsign-wasm`
+- `rust/crates/curve-napi`
 
 License inventory was collected with:
 
@@ -32,58 +33,70 @@ License inventory was collected with:
 cargo license -t
 ```
 
-### Crates present in both Rust projects
+### Third-party crates detected in the Rust workspace
 
-| Crate                      | License                             |
-| -------------------------- | ----------------------------------- |
-| block-buffer               | Apache-2.0 OR MIT                   |
-| bumpalo                    | Apache-2.0 OR MIT                   |
-| cfg-if                     | Apache-2.0 OR MIT                   |
-| cpufeatures                | Apache-2.0 OR MIT                   |
-| crypto-common              | Apache-2.0 OR MIT                   |
-| curve25519-dalek           | BSD-3-Clause                        |
-| curve25519-dalek-derive    | Apache-2.0 OR MIT                   |
-| digest                     | Apache-2.0 OR MIT                   |
-| ed25519                    | Apache-2.0 OR MIT                   |
-| ed25519-dalek              | BSD-3-Clause                        |
-| fiat-crypto                | Apache-2.0 OR BSD-1-Clause OR MIT   |
-| generic-array              | MIT                                 |
-| libc                       | Apache-2.0 OR MIT                   |
-| once_cell                  | Apache-2.0 OR MIT                   |
-| proc-macro2                | Apache-2.0 OR MIT                   |
-| quote                      | Apache-2.0 OR MIT                   |
-| rand_core                  | Apache-2.0 OR MIT                   |
-| rustc_version              | Apache-2.0 OR MIT                   |
-| rustversion                | Apache-2.0 OR MIT                   |
-| semver                     | Apache-2.0 OR MIT                   |
-| sha2                       | Apache-2.0 OR MIT                   |
-| signature                  | Apache-2.0 OR MIT                   |
-| subtle                     | BSD-3-Clause                        |
-| syn                        | Apache-2.0 OR MIT                   |
-| typenum                    | Apache-2.0 OR MIT                   |
-| unicode-ident              | (Apache-2.0 OR MIT) AND Unicode-3.0 |
-| version_check              | Apache-2.0 OR MIT                   |
-| wasm-bindgen               | Apache-2.0 OR MIT                   |
-| wasm-bindgen-macro         | Apache-2.0 OR MIT                   |
-| wasm-bindgen-macro-support | Apache-2.0 OR MIT                   |
-| wasm-bindgen-shared        | Apache-2.0 OR MIT                   |
-| x25519-dalek               | BSD-3-Clause                        |
-
-### Crates present only in `wasm/axlsign`
-
-| Crate   | License           |
-| ------- | ----------------- |
+| Crate | License |
+| ----- | ------- |
+| aho-corasick | MIT OR Unlicense |
+| bitflags | Apache-2.0 OR MIT |
+| block-buffer | Apache-2.0 OR MIT |
+| bumpalo | Apache-2.0 OR MIT |
+| cfg-if | Apache-2.0 OR MIT |
+| convert_case | MIT |
+| cpufeatures | Apache-2.0 OR MIT |
+| crypto-common | Apache-2.0 OR MIT |
+| ctor | Apache-2.0 OR MIT |
+| curve25519-dalek | BSD-3-Clause |
+| curve25519-dalek-derive | Apache-2.0 OR MIT |
+| digest | Apache-2.0 OR MIT |
+| ed25519 | Apache-2.0 OR MIT |
+| ed25519-dalek | BSD-3-Clause |
+| fiat-crypto | Apache-2.0 OR BSD-1-Clause OR MIT |
+| generic-array | MIT |
+| libc | Apache-2.0 OR MIT |
+| libloading | ISC |
+| memchr | MIT OR Unlicense |
+| napi | MIT |
+| napi-build | MIT |
+| napi-derive | MIT |
+| napi-derive-backend | MIT |
+| napi-sys | MIT |
+| once_cell | Apache-2.0 OR MIT |
+| proc-macro2 | Apache-2.0 OR MIT |
+| quote | Apache-2.0 OR MIT |
+| rand_core | Apache-2.0 OR MIT |
+| regex | Apache-2.0 OR MIT |
+| regex-automata | Apache-2.0 OR MIT |
+| regex-syntax | Apache-2.0 OR MIT |
+| rustc_version | Apache-2.0 OR MIT |
+| rustversion | Apache-2.0 OR MIT |
+| semver | Apache-2.0 OR MIT |
+| sha2 | Apache-2.0 OR MIT |
+| signature | Apache-2.0 OR MIT |
+| subtle | BSD-3-Clause |
+| syn | Apache-2.0 OR MIT |
+| typenum | Apache-2.0 OR MIT |
+| unicode-ident | (Apache-2.0 OR MIT) AND Unicode-3.0 |
+| unicode-segmentation | Apache-2.0 OR MIT |
+| version_check | Apache-2.0 OR MIT |
+| wasm-bindgen | Apache-2.0 OR MIT |
+| wasm-bindgen-macro | Apache-2.0 OR MIT |
+| wasm-bindgen-macro-support | Apache-2.0 OR MIT |
+| wasm-bindgen-shared | Apache-2.0 OR MIT |
+| windows-link | Apache-2.0 OR MIT |
+| x25519-dalek | BSD-3-Clause |
 | zeroize | Apache-2.0 OR MIT |
 
 ### Local Rust crates
 
 | Crate                   | License |
 | ----------------------- | ------- |
-| curve25519-node-wasm    | MIT     |
 | curve25519-node-axlsign | MIT     |
+| curve25519-node-napi    | MIT     |
+| curve25519-node-wasm    | MIT     |
 
 ## Notes
 
 - Upstream licenses remain with their respective authors and projects.
 - This NOTICE summarizes dependencies and does not replace upstream license texts.
-- For full build/runtime details, see `README.md`, `README.en.md`, and `wasm/README.md`.
+- For full build/runtime details, see `README.md`, `README.en.md`, and `rust/README.md`.

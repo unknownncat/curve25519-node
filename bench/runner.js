@@ -10,11 +10,10 @@ import {
 import { cpus } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 import legacyCurve from "curve25519-js";
-import { asBytes32, asBytes64, axlsign, ed25519, wasm, x25519 } from "@unknownncat/curve25519-node";
 
 import { parseArgs, modeSummary } from "./config.js";
 import { buildInputPool, copyU8, maybeCopyU8, createCycler } from "./pool.js";
@@ -29,12 +28,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, "..");
 
-const rootDistEntry = join(rootDir, "dist", "index.js");
+const rootDistEntry = join(rootDir, "packages", "node", "dist", "index.js");
 if (!existsSync(rootDistEntry)) {
   throw new Error(
-    "dist/ nao encontrado no projeto principal. Rode `npm run build` na raiz antes do benchmark."
+    "packages/node/dist/ nao encontrado. Rode `npm run build:node` (ou `npm run build`) na raiz antes do benchmark."
   );
 }
+
+const {
+  asBytes32,
+  asBytes64,
+  axlsign,
+  ed25519,
+  napi,
+  wasm,
+  x25519,
+} = await import(pathToFileURL(rootDistEntry).href);
 
 const X25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b656e04220420", "hex");
 const X25519_SPKI_PREFIX = Buffer.from("302a300506032b656e032100", "hex");
@@ -45,6 +54,7 @@ const SIGN_NOTE = "sign/verify comparisons measure API throughput, not cryptogra
 const OPENMSG_NOTE =
   "legacy openMessage mutates signed input; safe-copy mode is used to avoid invalid benchmarks";
 const AXL_NOTE = "axlsign comparisons are cryptographic-equivalence comparisons (same scheme)";
+const NAPI_NOTE = "napi comparisons are native Rust addon vs node:crypto runtime throughput";
 
 function debugLog(config, message) {
   if (!config.debug || config.quiet) return;
@@ -229,13 +239,17 @@ function printSuiteHeader(meta, config) {
   console.log(`openssl: ${meta.openssl}`);
   console.log(`cpu: ${meta.cpuModel} (logical cores: ${meta.logicalCores})`);
   console.log(
+    `runtime: napi=${meta.modes.napiEnabled ? "available" : "unavailable (napi pairs skipped)"}`
+  );
+  console.log(
     `config: rounds=${config.rounds}, roundMs=${config.roundMs}, warmupMs=${config.warmupMs}, vectors=${config.vectors}, gc=${config.gc}`
   );
   console.log(
     `modes: variants=${config.variants.join(",")}, strict=${config.strict}, debug=${config.debug}, verifyDuringBench=${config.verifyDuringBench}, verifyEvery=${config.verifyEvery}`
   );
-  console.log(`note: ${SIGN_NOTE}.`);
-  console.log(`note: ${AXL_NOTE}.`);
+  for (const note of meta.notes) {
+    console.log(`note: ${note}.`);
+  }
 }
 
 function printPairReport(pairReport, config) {
@@ -305,6 +319,16 @@ function buildContext(config) {
   const modernWasmXKeyPairs = seeds32.map((seed) => wasm.x25519.generateKeyPair(seed));
   const modernWasmEdKeyPairs = seeds32.map((seed) => wasm.ed25519.generateKeyPair(seed));
   const modernAxlKeyPairs = seeds32.map((seed) => axlsign.generateKeyPair(seed));
+  let napiEnabled = false;
+  if (typeof napi?.isAvailable === "function") {
+    const cwdBeforeNapiCheck = process.cwd();
+    try {
+      process.chdir(join(rootDir, "packages", "node"));
+      napiEnabled = napi.isAvailable();
+    } finally {
+      process.chdir(cwdBeforeNapiCheck);
+    }
+  }
   const legacyAxlKeyPairs = legacyXKeyPairs;
 
   const modernSharedVectors = modernXKeyPairs.map((kp, i) => ({
@@ -415,6 +439,12 @@ function buildContext(config) {
     ...v,
     signature: wasm.ed25519.sign(v.seed, v.msg),
   }));
+  const napiVerify32Vectors = napiEnabled
+    ? modernSign32Vectors.map((v) => ({
+        ...v,
+        signature: napi.ed25519.sign(v.seed, v.msg),
+      }))
+    : [];
   const legacyVerify32Vectors = legacySign32Vectors.map((v) => ({
     ...v,
     signature: legacyCurve.sign(v.secret, v.msg),
@@ -438,6 +468,12 @@ function buildContext(config) {
     ...v,
     signature: wasm.ed25519.sign(v.seed, v.msg),
   }));
+  const napiVerify1024Vectors = napiEnabled
+    ? modernSign1024Vectors.map((v) => ({
+        ...v,
+        signature: napi.ed25519.sign(v.seed, v.msg),
+      }))
+    : [];
   const legacyVerify1024Vectors = legacySign1024Vectors.map((v) => ({
     ...v,
     signature: legacyCurve.sign(v.secret, v.msg),
@@ -492,6 +528,12 @@ function buildContext(config) {
     ...v,
     signed: wasm.ed25519.signMessage(v.seed, v.msg),
   }));
+  const napiOpenMessageVectors = napiEnabled
+    ? modernSignMessageVectors.map((v) => ({
+        ...v,
+        signed: napi.ed25519.signMessage(v.seed, v.msg),
+      }))
+    : [];
   const legacyOpenMessageVectors = legacySignMessageVectors.map((v) => ({
     ...v,
     signed: legacyCurve.signMessage(v.secret, v.msg),
@@ -526,10 +568,27 @@ function buildContext(config) {
         publicKeys: modernWasmEdKeyPairs.map((kp) => wasm.ed25519.createPublicKeyObject(kp.public)),
       },
     },
+    napi: {
+      x25519: {
+        privateKeys: napiEnabled
+          ? modernXKeyPairs.map((kp) => napi.x25519.createPrivateKeyObject(kp.private))
+          : [],
+        publicKeys: napiEnabled
+          ? modernXKeyPairs.map((kp) => napi.x25519.createPublicKeyObject(kp.public))
+          : [],
+      },
+      ed25519: {
+        privateKeys: napiEnabled ? seeds32.map((seed) => napi.ed25519.createPrivateKeyObject(seed)) : [],
+        publicKeys: napiEnabled
+          ? modernEdKeyPairs.map((kp) => napi.ed25519.createPublicKeyObject(kp.public))
+          : [],
+      },
+    },
   };
 
   return {
     vectorCount,
+    napiEnabled,
     pool,
     seeds32,
     modernXKeyPairs,
@@ -559,11 +618,13 @@ function buildContext(config) {
     legacyAxlSign1024Vectors,
     modernVerify32Vectors,
     modernWasmVerify32Vectors,
+    napiVerify32Vectors,
     legacyVerify32Vectors,
     modernAxlVerify32Vectors,
     legacyAxlVerify32Vectors,
     modernVerify1024Vectors,
     modernWasmVerify1024Vectors,
+    napiVerify1024Vectors,
     legacyVerify1024Vectors,
     modernAxlVerify1024Vectors,
     legacyAxlVerify1024Vectors,
@@ -574,6 +635,7 @@ function buildContext(config) {
     legacyAxlSignMessageVectors,
     modernOpenMessageVectors,
     modernWasmOpenMessageVectors,
+    napiOpenMessageVectors,
     legacyOpenMessageVectors,
     modernAxlOpenMessageVectors,
     legacyAxlOpenMessageVectors,
@@ -672,6 +734,68 @@ function runPreflightValidation(context, issues, config) {
       issues
     );
     assertTrue(`wasm x25519 isAllZero32(shared) [${i}]`, !wasm.x25519.isAllZero32(wasmShared), issues);
+
+    if (context.napiEnabled) {
+      const napiX = napi.x25519.generateKeyPair(context.seeds32[i]);
+      assertBytesEqual(
+        `napi x25519 generateKeyPair public vs legacy [${i}]`,
+        napiX.public,
+        legacyX.public,
+        issues
+      );
+      assertBytesEqual(
+        `napi x25519 generateKeyPair private vs legacy [${i}]`,
+        napiX.private,
+        legacyX.private,
+        issues
+      );
+
+      const napiPublicFromSecret = napi.x25519.publicKey(clamped);
+      assertBytesEqual(
+        `napi x25519 publicKey vs legacy [${i}]`,
+        napiPublicFromSecret,
+        legacyX.public,
+        issues
+      );
+
+      const napiPrivateKeyObject = napi.x25519.createPrivateKeyObject(napiX.private);
+      const napiPeerPublicKeyObject = napi.x25519.createPublicKeyObject(
+        context.modernXKeyPairs[peerIndex].public
+      );
+      const napiPublicFromPrivateObject = napi.x25519.publicKeyFromPrivateKeyObject(napiPrivateKeyObject);
+      assertBytesEqual(
+        `napi x25519 publicKeyFromPrivateKeyObject vs legacy [${i}]`,
+        napiPublicFromPrivateObject,
+        legacyX.public,
+        issues
+      );
+
+      const napiShared = napi.x25519.sharedKey(napiX.private, context.modernXKeyPairs[peerIndex].public);
+      assertBytesEqual(`napi x25519 sharedKey vs legacy [${i}]`, napiShared, legacyShared, issues);
+
+      const napiSharedFromObjects = napi.x25519.sharedKeyFromKeyObjects(
+        napiPrivateKeyObject,
+        napiPeerPublicKeyObject
+      );
+      assertBytesEqual(
+        `napi x25519 sharedKeyFromKeyObjects vs legacy [${i}]`,
+        napiSharedFromObjects,
+        legacyShared,
+        issues
+      );
+
+      const napiSharedStrict = napi.x25519.sharedKeyStrictFromKeyObjects(
+        napiPrivateKeyObject,
+        napiPeerPublicKeyObject
+      );
+      assertBytesEqual(
+        `napi x25519 sharedKeyStrictFromKeyObjects vs legacy [${i}]`,
+        napiSharedStrict,
+        legacyShared,
+        issues
+      );
+      assertTrue(`napi x25519 isAllZero32(shared) [${i}]`, !napi.x25519.isAllZero32(napiShared), issues);
+    }
   }
 
   for (let i = 0; i < count; i += 1) {
@@ -738,6 +862,62 @@ function runPreflightValidation(context, issues, config) {
       legacyCurve.verify(legacyVerify32.public, legacyVerify32.msg, legacyVerify32.signatureRnd),
       issues
     );
+
+    if (context.napiEnabled) {
+      const napiAxl = napi.axlsign.generateKeyPair(context.seeds32[i]);
+      assertBytesEqual(`axlsign publicKey napi vs legacy [${i}]`, napiAxl.public, legacyAxl.public, issues);
+      assertBytesEqual(`axlsign private napi vs legacy [${i}]`, napiAxl.private, legacyAxl.private, issues);
+
+      const napiPublicFromSecret = napi.axlsign.publicKey(napiAxl.private);
+      assertBytesEqual(
+        `axlsign publicKey(secret) napi vs legacy [${i}]`,
+        napiPublicFromSecret,
+        legacyAxl.public,
+        issues
+      );
+
+      const napiShared = napi.axlsign.sharedKey(napiAxl.private, context.modernAxlKeyPairs[peerIndex].public);
+      assertBytesEqual(`axlsign sharedKey napi vs legacy [${i}]`, napiShared, legacyShared, issues);
+
+      const rnd32 = context.modernAxlSign32Vectors[i].rnd;
+      const napiSignature32 = napi.axlsign.sign(napiAxl.private, modernVerify32.msg);
+      const napiSignature32Rnd = napi.axlsign.sign(napiAxl.private, modernVerify32.msg, rnd32);
+      assertBytesEqual(
+        `axlsign sign(msg32) napi vs legacy [${i}]`,
+        napiSignature32,
+        legacyVerify32.signature,
+        issues
+      );
+      assertBytesEqual(
+        `axlsign sign(msg32,opt_random) napi vs legacy [${i}]`,
+        napiSignature32Rnd,
+        legacyVerify32.signatureRnd,
+        issues
+      );
+      assertTrue(
+        `axlsign verify(sign(msg32)) napi [${i}]`,
+        napi.axlsign.verify(legacyVerify32.public, legacyVerify32.msg, napiSignature32),
+        issues
+      );
+      assertTrue(
+        `axlsign verify(sign(msg32,opt_random)) napi [${i}]`,
+        napi.axlsign.verify(legacyVerify32.public, legacyVerify32.msg, napiSignature32Rnd),
+        issues
+      );
+
+      const modernAxlMsg = context.modernAxlSignMessageVectors[i];
+      const napiSigned = napi.axlsign.signMessage(napiAxl.private, modernAxlMsg.msg);
+      const napiSignedRnd = napi.axlsign.signMessage(napiAxl.private, modernAxlMsg.msg, modernAxlMsg.rnd);
+      const openedNapi = napi.axlsign.openMessage(modernAxlMsg.public, napiSigned);
+      const openedNapiRnd = napi.axlsign.openMessage(modernAxlMsg.public, napiSignedRnd);
+      assertPayloadEqual(`axlsign signMessage/openMessage napi [${i}]`, openedNapi, modernAxlMsg.msg, issues);
+      assertPayloadEqual(
+        `axlsign signMessage/openMessage opt_random napi [${i}]`,
+        openedNapiRnd,
+        modernAxlMsg.msg,
+        issues
+      );
+    }
   }
 
   for (let i = 0; i < count; i += 1) {
@@ -804,6 +984,59 @@ function runPreflightValidation(context, issues, config) {
       issues
     );
 
+    if (context.napiEnabled) {
+      const napi32 = context.napiVerify32Vectors[i];
+      const napi1024 = context.napiVerify1024Vectors[i];
+
+      assertBytesEqual(
+        `napi ed25519 sign(msg32) vs modern [${i}]`,
+        napi32.signature,
+        modern32.signature,
+        issues
+      );
+      assertBytesEqual(
+        `napi ed25519 sign(msg1024) vs modern [${i}]`,
+        napi1024.signature,
+        modern1024.signature,
+        issues
+      );
+      assertTrue(
+        `napi ed25519 verify(sign(msg32)) [${i}]`,
+        napi.ed25519.verify(napi32.public, napi32.msg, napi32.signature),
+        issues
+      );
+      assertTrue(
+        `napi ed25519 verify(sign(msg1024)) [${i}]`,
+        napi.ed25519.verify(napi1024.public, napi1024.msg, napi1024.signature),
+        issues
+      );
+
+      const napiPrivateKeyObject = napi.ed25519.createPrivateKeyObject(napi32.seed);
+      const napiPublicKeyObject = napi.ed25519.createPublicKeyObject(napi32.public);
+      const napiPublicFromPrivateObject = napi.ed25519.publicKeyFromPrivateKeyObject(napiPrivateKeyObject);
+      assertBytesEqual(
+        `napi ed25519 publicKeyFromPrivateKeyObject [${i}]`,
+        napiPublicFromPrivateObject,
+        napi32.public,
+        issues
+      );
+      const napiSignatureFromPrivateObject = napi.ed25519.signWithPrivateKey(
+        napiPrivateKeyObject,
+        napi32.msg
+      );
+      assertBytesEqual(
+        `napi ed25519 signWithPrivateKey deterministic [${i}]`,
+        napiSignatureFromPrivateObject,
+        napi32.signature,
+        issues
+      );
+      assertTrue(
+        `napi ed25519 verifyWithPublicKey(sign(msg32)) [${i}]`,
+        napi.ed25519.verifyWithPublicKey(napiPublicKeyObject, napi32.msg, napi32.signature),
+        issues
+      );
+    }
+
     const modernSigned = context.modernOpenMessageVectors[i];
     const legacySigned = context.legacyOpenMessageVectors[i];
 
@@ -813,6 +1046,18 @@ function runPreflightValidation(context, issues, config) {
     const wasmSigned = context.modernWasmOpenMessageVectors[i];
     const wasmOpened = wasm.ed25519.openMessage(wasmSigned.public, wasmSigned.signed);
     assertPayloadEqual(`wasm ed25519 signMessage/openMessage [${i}]`, wasmOpened, wasmSigned.msg, issues);
+
+    if (context.napiEnabled) {
+      const napiSigned = context.napiOpenMessageVectors[i];
+      assertBytesEqual(
+        `napi ed25519 signMessage(msg256) vs modern [${i}]`,
+        napiSigned.signed,
+        modernSigned.signed,
+        issues
+      );
+      const napiOpened = napi.ed25519.openMessage(napiSigned.public, napiSigned.signed);
+      assertPayloadEqual(`napi ed25519 signMessage/openMessage [${i}]`, napiOpened, napiSigned.msg, issues);
+    }
 
     const legacyOpened = legacyCurve.openMessage(legacySigned.public, copyU8(legacySigned.signed));
     assertPayloadEqual(`legacy signMessage/openMessage [${i}]`, legacyOpened, legacySigned.msg, issues);
@@ -1302,6 +1547,228 @@ function buildModernWasmTasksForVariant(context, variant, issues) {
         verify: (opened) => {
           const input = last.value;
           assertPayloadEqual("modern wasm openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+  };
+}
+
+function buildModernNapiTasksForVariant(context, variant, issues) {
+  if (!context.napiEnabled) {
+    throw new Error("napi task builder called while napi addon is unavailable");
+  }
+
+  const n = context.vectorCount;
+
+  const nextSeed = createCycler(context.seeds32);
+  const nextShared = createCycler(context.modernSharedVectors);
+  const nextSign32 = createCycler(context.modernSign32Vectors);
+  const nextSign1024 = createCycler(context.modernSign1024Vectors);
+  const nextVerify32 = createCycler(context.napiVerify32Vectors);
+  const nextVerify1024 = createCycler(context.napiVerify1024Vectors);
+  const nextSignMessage = createCycler(context.modernSignMessageVectors);
+  const nextOpenMessage = createCycler(context.napiOpenMessageVectors);
+
+  const makeNapiSign = (vector, msg) => {
+    if (variant === "cached") {
+      const msgInput = variant === "copy" ? copyU8(msg) : msg;
+      return napi.ed25519.signWithPrivateKey(
+        context.cached.napi.ed25519.privateKeys[vector.index],
+        msgInput
+      );
+    }
+
+    const seedInput = variant === "copy" ? asBytes32(copyU8(vector.seed), "seed copy") : vector.seed;
+    const msgInput = maybeCopyU8(msg, variant === "copy");
+    return napi.ed25519.sign(seedInput, msgInput);
+  };
+
+  const makeNapiVerify = (vector) => {
+    const msgInput = maybeCopyU8(vector.msg, variant === "copy");
+    const signatureInput = variant === "copy" ? asBytes64(copyU8(vector.signature), "signature copy") : vector.signature;
+
+    if (variant === "cached") {
+      return napi.ed25519.verifyWithPublicKey(
+        context.cached.napi.ed25519.publicKeys[vector.index],
+        msgInput,
+        signatureInput
+      );
+    }
+
+    const publicInput = variant === "copy" ? asBytes32(copyU8(vector.public), "public key copy") : vector.public;
+    return napi.ed25519.verify(publicInput, msgInput, signatureInput);
+  };
+
+  return {
+    generateKeyPair: (() => {
+      let last = null;
+      return {
+        name: "modern napi.x25519.generateKeyPair",
+        run: () => {
+          const selected = nextSeed();
+          last = selected;
+          const seed = selected.value;
+          if (variant === "cached") {
+            const privateObject = context.cached.napi.x25519.privateKeys[selected.index];
+            return {
+              public: napi.x25519.publicKeyFromPrivateKeyObject(privateObject),
+              private: privateObject.bytes,
+            };
+          }
+          const seedInput = variant === "copy" ? asBytes32(copyU8(seed), "seed copy") : seed;
+          return napi.x25519.generateKeyPair(seedInput);
+        },
+        verify: (result) => {
+          const expected = context.modernXKeyPairs[last.index];
+          assertBytesEqual("modern napi generateKeyPair public", result.public, expected.public, issues);
+          assertBytesEqual("modern napi generateKeyPair private", result.private, expected.private, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sharedKey: (() => {
+      let last = null;
+      return {
+        name: "modern napi.x25519.sharedKey",
+        run: () => {
+          const selected = nextShared();
+          last = selected;
+          const input = selected.value;
+          if (variant === "cached") {
+            return napi.x25519.sharedKeyFromKeyObjects(
+              context.cached.napi.x25519.privateKeys[input.index],
+              context.cached.napi.x25519.publicKeys[(input.index + 1) % n]
+            );
+          }
+          const secretInput = variant === "copy" ? asBytes32(copyU8(input.secret), "secret copy") : input.secret;
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public copy") : input.public;
+          return napi.x25519.sharedKey(secretInput, publicInput);
+        },
+        verify: (result) => {
+          const expected = context.sharedExpected[last.index];
+          assertBytesEqual("modern napi sharedKey", result, expected, issues);
+        },
+        samples: [],
+      };
+    })(),
+    sign32: (() => {
+      let last = null;
+      return {
+        name: "modern napi.ed25519.sign",
+        run: () => {
+          const selected = nextSign32();
+          last = selected;
+          return makeNapiSign(selected.value, selected.value.msg);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern napi sign(msg32) verifies",
+            napi.ed25519.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    sign1024: (() => {
+      let last = null;
+      return {
+        name: "modern napi.ed25519.sign",
+        run: () => {
+          const selected = nextSign1024();
+          last = selected;
+          return makeNapiSign(selected.value, selected.value.msg);
+        },
+        verify: (signature) => {
+          const input = last.value;
+          assertTrue(
+            "modern napi sign(msg1024) verifies",
+            napi.ed25519.verify(input.public, input.msg, asBytes64(signature, "signature")),
+            issues
+          );
+        },
+        samples: [],
+      };
+    })(),
+    verify32: {
+      name: "modern napi.ed25519.verify",
+      run: () => makeNapiVerify(nextVerify32().value),
+      verify: (ok) => {
+        assertTrue("modern napi verify(msg32)", ok, issues);
+      },
+      samples: [],
+    },
+    verify1024: {
+      name: "modern napi.ed25519.verify",
+      run: () => makeNapiVerify(nextVerify1024().value),
+      verify: (ok) => {
+        assertTrue("modern napi verify(msg1024)", ok, issues);
+      },
+      samples: [],
+    },
+    signMessage: (() => {
+      let last = null;
+      return {
+        name: "modern napi.ed25519.signMessage",
+        run: () => {
+          const selected = nextSignMessage();
+          last = selected;
+          const v = selected.value;
+
+          if (variant === "cached") {
+            const msgInput = variant === "copy" ? copyU8(v.msg) : v.msg;
+            const signature = napi.ed25519.signWithPrivateKey(
+              context.cached.napi.ed25519.privateKeys[v.index],
+              msgInput
+            );
+            const out = new Uint8Array(64 + msgInput.byteLength);
+            out.set(signature, 0);
+            out.set(msgInput, 64);
+            return out;
+          }
+
+          const seedInput = variant === "copy" ? asBytes32(copyU8(v.seed), "seed copy") : v.seed;
+          const msgInput = maybeCopyU8(v.msg, variant === "copy");
+          return napi.ed25519.signMessage(seedInput, msgInput);
+        },
+        verify: (signed) => {
+          const input = last.value;
+          const opened = napi.ed25519.openMessage(input.public, signed);
+          assertPayloadEqual("modern napi signMessage/openMessage", opened, input.msg, issues);
+        },
+        samples: [],
+      };
+    })(),
+    openMessage: (() => {
+      let last = null;
+      return {
+        name: "modern napi.ed25519.openMessage",
+        run: () => {
+          const selected = nextOpenMessage();
+          last = selected;
+          const input = selected.value;
+          const signedInput = makeSafeOpenInput(variant, input.signed, variant !== "nocopy");
+
+          if (variant === "cached") {
+            const signature = asBytes64(signedInput.subarray(0, 64), "signature");
+            const msg = signedInput.subarray(64);
+            const ok = napi.ed25519.verifyWithPublicKey(
+              context.cached.napi.ed25519.publicKeys[input.index],
+              msg,
+              signature
+            );
+            if (!ok) return null;
+            return new Uint8Array(msg);
+          }
+
+          const publicInput = variant === "copy" ? asBytes32(copyU8(input.public), "public key copy") : input.public;
+          return napi.ed25519.openMessage(publicInput, signedInput);
+        },
+        verify: (opened) => {
+          const input = last.value;
+          assertPayloadEqual("modern napi openMessage", opened, input.msg, issues);
         },
         samples: [],
       };
@@ -1973,6 +2440,12 @@ function buildPairDescriptors(context, variant, issues, config) {
     return [modernAxl[modernKey], legacyAxl[legacyKey]];
   };
 
+  const napiVsModern = (napiKey, modernKey = napiKey) => {
+    const modernNapi = buildModernNapiTasksForVariant(context, variant, issues);
+    const modern = buildModernTasksForVariant(context, variant, issues, config);
+    return [modernNapi[napiKey], modern[modernKey]];
+  };
+
   return [
     {
       id: `x25519.generateKeyPair.${variant}`,
@@ -1994,6 +2467,50 @@ function buildPairDescriptors(context, variant, issues, config) {
       label: `[${variant}] WASM X25519 sharedKey(sk, pk)`,
       tasks: wasmVsLegacy("sharedKey"),
     },
+    ...(context.napiEnabled
+      ? [
+          {
+            id: `napi.x25519.generateKeyPair.${variant}`,
+            label: `[${variant}] NAPI X25519 generateKeyPair(seed32) [same scheme]`,
+            tasks: napiVsModern("generateKeyPair"),
+          },
+          {
+            id: `napi.x25519.sharedKey.${variant}`,
+            label: `[${variant}] NAPI X25519 sharedKey(sk, pk) [same scheme]`,
+            tasks: napiVsModern("sharedKey"),
+          },
+          {
+            id: `napi.sign.32.${variant}`,
+            label: `[${variant}] NAPI Signature sign(msg32) [same scheme]`,
+            tasks: napiVsModern("sign32"),
+          },
+          {
+            id: `napi.sign.1024.${variant}`,
+            label: `[${variant}] NAPI Signature sign(msg1024) [same scheme]`,
+            tasks: napiVsModern("sign1024"),
+          },
+          {
+            id: `napi.verify.32.${variant}`,
+            label: `[${variant}] NAPI Signature verify(msg32) [same scheme]`,
+            tasks: napiVsModern("verify32"),
+          },
+          {
+            id: `napi.verify.1024.${variant}`,
+            label: `[${variant}] NAPI Signature verify(msg1024) [same scheme]`,
+            tasks: napiVsModern("verify1024"),
+          },
+          {
+            id: `napi.signMessage.256.${variant}`,
+            label: `[${variant}] NAPI signMessage(msg256) [same scheme]`,
+            tasks: napiVsModern("signMessage"),
+          },
+          {
+            id: `napi.openMessage.256.${variant}`,
+            label: `[${variant}] NAPI openMessage(msg256) [same scheme]`,
+            tasks: napiVsModern("openMessage"),
+          },
+        ]
+      : []),
     {
       id: `axlsign.generateKeyPair.${variant}`,
       label: `[${variant}] axlsign generateKeyPair(seed32)`,
@@ -2304,6 +2821,14 @@ export async function run(argv = process.argv.slice(2)) {
   const config = parseArgs(argv);
   const issues = createIssueManager(config);
 
+  const context = buildContext(config);
+  if (context.vectorCount < 64) {
+    throw new Error(`vector pool must be >= 64, got ${context.vectorCount}`);
+  }
+  if (!context.napiEnabled) {
+    issues.warnings.push("napi addon unavailable; skipping napi benchmark pairs");
+  }
+
   const meta = {
     timestamp: new Date().toISOString(),
     node: process.version,
@@ -2317,16 +2842,14 @@ export async function run(argv = process.argv.slice(2)) {
       vectors: config.vectors,
       gc: config.gc,
     },
-    modes: modeSummary(config),
-    notes: [SIGN_NOTE, AXL_NOTE, OPENMSG_NOTE],
+    modes: {
+      ...modeSummary(config),
+      napiEnabled: context.napiEnabled,
+    },
+    notes: context.napiEnabled ? [SIGN_NOTE, AXL_NOTE, OPENMSG_NOTE, NAPI_NOTE] : [SIGN_NOTE, AXL_NOTE, OPENMSG_NOTE],
   };
 
   printSuiteHeader(meta, config);
-
-  const context = buildContext(config);
-  if (context.vectorCount < 64) {
-    throw new Error(`vector pool must be >= 64, got ${context.vectorCount}`);
-  }
   debugLog(config, `vector pool ready: ${context.vectorCount}`);
 
   runPreflightValidation(context, issues, config);
